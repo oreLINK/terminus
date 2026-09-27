@@ -85,10 +85,21 @@ test("un tram qu'on ne peut pas rejoindre à pied à temps est ignoré", () => {
 });
 
 test("plus aucun tram atteignable : statut missed", () => {
-  const r = run([eastbound("gone", min(-10))]);
+  const r = run([eastbound("tight", min(-4))]);
+  assert.equal(r.status, "missed");
+});
+
+test("le dernier tram est parti : statut over, pas none", () => {
+  // Fin de service ou travaux nocturnes : la ligne a roulé plus tôt, plus rien ensuite.
+  const r = run([eastbound("early", min(-90)), eastbound("gone", min(-10)), westbound("w1", min(20))]);
+  assert.equal(r.status, "over");
+  assert.equal(r.options.length, 0);
+});
+
+test("aucun tram ne relie les deux côtés de la journée : statut none", () => {
+  // Seulement des trams vers l'ouest, et une course partielle qui s'arrête avant Est.
+  const r = run([westbound("w1", min(-30)), westbound("w2", min(20)), eastbound("short", min(-20), { toEnd: false })]);
   assert.equal(r.status, "none");
-  const r2 = run([eastbound("tight", min(-4))]);
-  assert.equal(r2.status, "missed");
 });
 
 test("service terminé : le prochain départ est demain matin", () => {

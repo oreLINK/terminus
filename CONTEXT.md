@@ -39,7 +39,8 @@ Document de passation. Il décrit le projet, ses choix et son état pour qu'un d
    Dans tous ces états, le compteur est remplacé par un message, et les deux cartes restent affichées.
    - `ended` : la journée commerciale a basculé, le prochain départ est dans plus de 2 h → « Plus de tram ce soir » + premier départ.
    - `missed` : des courses existent mais aucune n'est atteignable à pied à temps.
-   - `none` : aucune course directe restante.
+   - `over` : le trajet direct existait plus tôt dans la journée, mais le dernier tram est parti (fin de service, travaux nocturnes…) → bloc noir « Plus de tram ce soir ».
+   - `none` : aucune course de la journée ne relie les deux côtés (gris).
    - Pas de ligne commune entre les deux côtés → message + liste des arrêts proches des deux côtés (les correspondances sont prévues plus tard).
    - À moins de 300 m du domicile → « Vous êtes à deux pas de chez vous ».
    - Erreur API → « Horaires indisponibles » + « Réessayer ».
@@ -137,7 +138,7 @@ Non utilisé pour l'instant mais disponible : `stop-monitoring.json` (passages �
 4. **Options** (`plan`) : pour chaque course, on repère la première occurrence de chaque station candidate. Pour chaque couple (station de départ O, station d'arrivée D) où O précède D dans la course, on ajoute un « trip » à l'option O→D. Le sens de circulation et les courses partielles sont ainsi gérés sans connaître la topologie des lignes. **Une option regroupe toutes les lignes** qui relient O à D (tronc commun C/D par exemple).
 5. **Par option** : trips triés par heure de départ ; « atteignables » = départ ≥ maintenant + temps de marche vers O. `next` = premier atteignable, `last` = dernier atteignable, `leaveBy` = `last.dep` − marche, `arriveHome` = `next.arr` + marche depuis D. Les options sans trip atteignable sont écartées.
 6. **Tri** : par `arriveHome` croissant, puis marche vers O. L'option `primary` est la première. `later` = l'option au `leaveBy` le plus tardif si elle dépasse celui de `primary` d'au moins 2 min. `alternatives` = jusqu'à 3 options avec des stations de départ différentes.
-7. **Statuts** : `ok`, `ended` (prochain départ de `primary` dans plus de 2 h), `missed` (des trips existent mais aucun atteignable), `none` (aucun trip).
+7. **Statuts** : `ok`, `ended` (prochain départ de `primary` dans plus de 2 h), `missed` (des trips existent mais aucun atteignable), `over` (aucun trip à venir, mais au moins une course a relié les deux côtés plus tôt dans la journée), `none` (aucune course ne les relie de la journée). `over` repose sur une hypothèse non vérifiée : que `estimated-timetable` garde les courses déjà passées de la journée commerciale en cours (le 27/09 à 21 h, le tram A sens 0 renvoyait 300 courses, soit plus qu'un demi-service, ce qui va dans ce sens). Si elles disparaissent, on retombe sur `none`.
 
 Temps de marche (`util.js`) : distance à vol d'oiseau × 1,3, à 78 m/min (environ 4,7 km/h), arrondi à la minute supérieure, minimum 1 min. Pour l'heure de départ d'un arrêt, on utilise l'heure temps réel si elle existe, sinon l'heure théorique.
 
@@ -168,7 +169,7 @@ Intention : lisible d'une main, la nuit, dehors. **Un seul élément fort : le c
 
 ## 9. Tests et vérification
 
-- `npm test` (Node 18+) : 13 tests. `planner.test.mjs` (8) : le regroupement en stations, les lignes communes, le choix du dernier tram indépendamment de l'ordre du JSON, l'exclusion des courses partielles, les trams inatteignables à pied, les statuts `none`/`missed`/`ended`, et la lecture du format Mecatran. `registry.test.mjs` (5) : complétude des réseaux et des types d'information, adaptateur `last-ride`, choix de la ville d'après la position, domicile par réseau et reprise de `dt.home.v1`.
+- `npm test` (Node 18+) : 15 tests. `planner.test.mjs` (10) : le regroupement en stations, les lignes communes, le choix du dernier tram indépendamment de l'ordre du JSON, l'exclusion des courses partielles, les trams inatteignables à pied, les statuts `none`/`missed`/`over`/`ended`, et la lecture du format Mecatran. `registry.test.mjs` (5) : complétude des réseaux et des types d'information, adaptateur `last-ride`, choix de la ville d'après la position, domicile par réseau et reprise de `dt.home.v1`.
 - Test local du site : `python3 -m http.server 8000` puis `http://localhost:8000` (les modules ES ne se chargent pas en `file://`).
 - Le rendu a été vérifié dans Chromium headless avec des réponses d'API simulées, en clair et en sombre.
 
@@ -180,7 +181,7 @@ Intention : lisible d'une main, la nuit, dehors. **Un seul élément fort : le c
 - Temps de marche estimés, pas calculés sur le réseau piéton.
 - Poids des réponses `estimated-timetable` en journée (tout le reste de la journée pour chaque ligne concernée, deux sens).
 - L'état « service terminé » repose sur une heuristique (prochain départ dans plus de 2 h).
-- Pas de prise en compte des perturbations (travaux, arrêts déplacés).
+- Perturbations : les messages (`general-message.json`) ne sont pas affichés. En revanche, les horaires publiés intègrent les travaux planifiés : vérifié dans le GTFS statique pour les travaux nocturnes du 28/09 au 02/10 (tram F sans course après 20 h 45, tram A limité à Stalingrad en fin de soirée). Qu'`estimated-timetable` reprenne ces horaires reste à vérifier un soir de travaux.
 
 ## 11. Pistes pour la suite, par priorité
 

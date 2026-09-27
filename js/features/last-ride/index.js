@@ -412,6 +412,14 @@ function mount({ root, network, adapter }) {
         "",
         "late",
       );
+    } else if (result.status === "over") {
+      hero = heroText(
+        "Service terminé",
+        "Plus de tram ce soir",
+        `Le dernier tram direct vers chez vous est parti.${esc(night)}`,
+        "",
+        "late",
+      );
     } else if (result.status === "noline") {
       hero = heroText(
         "Pas de tram direct",
@@ -435,8 +443,9 @@ function mount({ root, network, adapter }) {
       };
     } else {
       const near = origins[0];
+      const why = result.status === "over" ? "plus de tram ce soir" : "sans tram direct";
       station = near
-        ? { value: esc(near.station.name), detail: `${near.walk.minutes} min à pied, sans tram direct` }
+        ? { value: esc(near.station.name), detail: `${near.walk.minutes} min à pied, ${why}` }
         : { value: "Aucun", detail: "" };
     }
 

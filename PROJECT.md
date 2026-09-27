@@ -32,8 +32,8 @@ Vous pouvez aussi actualiser les horaires ou corriger votre position (« Je ne s
 - Terminus couvre les trams des lignes A à F et propose des trajets directs, sans correspondance.
 - Les temps de marche sont des estimations ; ils ne suivent pas le réseau réel des rues. Consultez l'itinéraire piéton avant de partir.
 - Les horaires en temps réel ne sont pas toujours disponibles. Les départs éloignés dans le temps peuvent être des horaires prévus.
-- Les perturbations du réseau ne sont pas prises en compte.
-- Si aucun trajet direct n'est possible, si le dernier tram est déjà hors d'atteinte ou si le service est terminé, Terminus l'indique. Il ne remplace pas les informations officielles du réseau.
+- Les travaux programmés sont pris en compte quand ils figurent dans les horaires publiés par le réseau. Les messages de perturbation ne sont pas encore affichés.
+- Si aucun trajet direct n'est possible, si le dernier tram est déjà hors d'atteinte ou si le service est terminé (y compris plus tôt que d'habitude, un soir de travaux), Terminus l'indique. Il ne remplace pas les informations officielles du réseau.
 - L'adresse du domicile est enregistrée dans le navigateur utilisé. Les horaires et les suggestions d'adresses sont fournis par les services publics de transport et de géocodage ; les liens d'itinéraire ouvrent Google Maps.
 
 Terminus est un projet indépendant, sans lien avec TBM ni Keolis Bordeaux Métropole Mobilités.
