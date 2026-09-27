@@ -15,8 +15,11 @@ function init() {
   });
 }
 
-export function openSheet(title, html) {
+// `tall` : feuille haute, ancrée en haut de l'écran, pour les formulaires. Sur téléphone,
+// le clavier monte par le bas et masquerait un champ placé dans une feuille basse.
+export function openSheet(title, html, { tall = false } = {}) {
   init();
+  dialog.classList.toggle("sheet-tall", tall);
   const body = document.getElementById("sheet-body");
   document.getElementById("sheet-title").textContent = title;
   body.innerHTML = html;
