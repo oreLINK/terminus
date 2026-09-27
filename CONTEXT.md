@@ -15,7 +15,7 @@ Document de passation. Il décrit le projet, ses choix et son état pour qu'un d
 
 - **100 % statique** : HTML, CSS et JavaScript en modules ES natifs. Pas de build, pas de framework, pas de dépendance npm à l'exécution. `package.json` ne sert qu'aux tests.
 - **Aucun backend** : le navigateur appelle directement les API publiques.
-- **Déploiement GitHub Pages**, en HTTPS (obligatoire pour la géolocalisation).
+- **Déploiement GitHub Pages**, en HTTPS (obligatoire pour la géolocalisation). Branches : `dev` (en cours), `main` (final, alimentée uniquement par pull request), `gh-pages` (site publié, écrite uniquement par l'Action `deploy.yml` à chaque merge dans `main`). L'« assemblage » copie `index.html`, `css/`, `js/` sans les transformer : ne jamais introduire d'étape de compilation. Détails dans `README.md`.
 - **Interface en français, vouvoiement**, phrases courtes, casse de phrase, pas de jargon technique à l'écran.
 - **Mobile d'abord** : usage typique la nuit, sur un trottoir, d'une main.
 - Adresse du domicile stockée uniquement dans le `localStorage` du navigateur.
