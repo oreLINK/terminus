@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Terminus, le dernier tram pour rentrer chez vous</title>
+  <meta name="description" content="Terminus : l'arrêt de tram le plus proche pour rentrer chez vous et l'heure du dernier départ, en temps réel, à Bordeaux Métropole.">
+  <meta property="og:title" content="Terminus">
+  <meta property="og:description" content="Le dernier tram pour rentrer chez vous, à Bordeaux Métropole.">
+  <meta name="theme-color" content="#F3F5F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#12202E" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312202E'/%3E%3Crect x='5' y='14' width='17' height='4' fill='%23FFB547'/%3E%3Crect x='21' y='8' width='5' height='16' rx='1' fill='%23FFB547'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <p class="wordmark">Terminus</p>
+    <nav class="pickers" aria-label="Réglages">
+      <button type="button" class="picker" data-action="open-city" aria-haspopup="dialog">
+        <svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>
+        <span class="visually-hidden">Ville :</span>
+        <span id="picker-city">Ville</span>
+      </button>
+      <button type="button" class="picker" data-action="open-feature" aria-haspopup="dialog">
+        <span class="visually-hidden">Information :</span>
+        <span id="picker-feature">Information</span>
+      </button>
+    </nav>
+  </header>
+
+  <main id="app">
+    <section class="message" role="status">
+      <p class="message-title">Chargement…</p>
+    </section>
+    <noscript>
+      <p class="message-text">Ce site a besoin de JavaScript pour calculer votre trajet.</p>
+    </noscript>
+  </main>
+
+  <p id="compute-status" class="visually-hidden" role="status"></p>
+
+  <dialog id="sheet" class="sheet" aria-labelledby="sheet-title">
+    <div class="sheet-panel">
+      <div class="sheet-head">
+        <h2 class="sheet-title" id="sheet-title"></h2>
+        <form method="dialog">
+          <button type="submit" class="link-button">Fermer</button>
+        </form>
+      </div>
+      <div class="sheet-body" id="sheet-body"></div>
+    </div>
+  </dialog>
+
+  <footer class="site-footer">
+    <p class="footer-sources" id="footer-sources"></p>
+  </footer>
+</body>
+</html>
