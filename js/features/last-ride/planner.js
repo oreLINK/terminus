@@ -91,6 +91,7 @@ export function plan({ origins, dests, journeys, index, lineCodes, now }) {
   const originById = new Map(origins.map((o) => [o.station.id, o]));
   const destById = new Map(dests.map((d) => [d.station.id, d]));
   const byPair = new Map();
+  let servedEarlier = false; // un tram a relié les deux côtés plus tôt dans la journée
 
   for (const j of journeys) {
     const firstIndex = new Map();
@@ -103,7 +104,7 @@ export function plan({ origins, dests, journeys, index, lineCodes, now }) {
       const origin = originById.get(oid);
       if (!origin) continue;
       const oc = j.calls[oi];
-      if (oc.cancelled || oc.dep < now - MIN) continue;
+      if (oc.cancelled) continue;
 
       for (const [did, di] of firstIndex) {
         if (di <= oi || did === oid) continue;
@@ -111,6 +112,10 @@ export function plan({ origins, dests, journeys, index, lineCodes, now }) {
         if (!dest) continue;
         const dc = j.calls[di];
         if (dc.cancelled) continue;
+        if (oc.dep < now - MIN) {
+          servedEarlier = true;
+          continue;
+        }
         const key = `${oid}|${did}`;
         if (!byPair.has(key)) byPair.set(key, { origin, dest, trips: [] });
         byPair.get(key).trips.push({
@@ -149,7 +154,10 @@ export function plan({ origins, dests, journeys, index, lineCodes, now }) {
 
   options.sort((a, b) => a.arriveHome - b.arriveHome || a.origin.walk.meters - b.origin.walk.meters);
 
-  if (!options.length) return { status: byPair.size ? "missed" : "none", options };
+  // missed : des trams restent, mais aucun n'est rejoignable à pied à temps.
+  // over : le trajet existait plus tôt, le dernier tram est parti (fin de service, travaux…).
+  // none : aucun tram ne relie les deux côtés de la journée.
+  if (!options.length) return { status: byPair.size ? "missed" : servedEarlier ? "over" : "none", options };
 
   const primary = options[0];
   // La journée commerciale a basculé : le prochain départ est demain matin.
