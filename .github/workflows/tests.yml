@@ -1,0 +1,23 @@
+# Tests à chaque push sur dev et sur chaque pull request vers main.
+# Le job « Tests » peut être exigé par la règle de protection de main.
+name: Tests
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test

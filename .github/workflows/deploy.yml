@@ -1,0 +1,60 @@
+# À chaque merge dans main : tests, assemblage du site, puis publication dans la branche gh-pages,
+# que GitHub Pages sert (Settings > Pages > Deploy from a branch > gh-pages, / (root)).
+# Pas d'étape de compilation : le site est statique. « Assembler » = ne garder que les fichiers servis.
+name: Déploiement GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # pousser sur gh-pages
+
+# Un seul déploiement à la fois, dans l'ordre des merges.
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Tests
+        run: npm test
+
+      - name: Assembler le site
+        run: |
+          mkdir _site
+          cp -R index.html css js _site/
+          # Pas de traitement Jekyll : les fichiers sont servis tels quels.
+          touch _site/.nojekyll
+          # Version publiée, consultable à /version.json.
+          printf '{"commit":"%s","date":"%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > _site/version.json
+
+      - name: Publier dans gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repo="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          # La branche gh-pages est créée au premier déploiement, puis garde l'historique des versions.
+          if git ls-remote --exit-code --heads "$repo" gh-pages > /dev/null; then
+            git clone --quiet --depth 1 --branch gh-pages "$repo" pub
+          else
+            git init --quiet --initial-branch gh-pages pub
+            git -C pub remote add origin "$repo"
+          fi
+          find pub -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R _site/. pub/
+          cd pub
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git commit --quiet -m "Déploiement de ${GITHUB_SHA::7}"
+          git push --quiet origin gh-pages

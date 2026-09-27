@@ -32,23 +32,43 @@ npm test
 
 Ajoutez ou adaptez un test lorsque le comportement calculé change. Toute modification de `planner.js` doit être accompagnée d'un test dans `tests/planner.test.mjs`. Un nouveau réseau ou type d'information doit passer `tests/registry.test.mjs`.
 
-## Contributions et GitHub
+## Branches, contributions et GitHub
 
-Convention de contribution du projet :
+| Branche | Rôle | Alimentée par |
+|---|---|---|
+| `dev` | développements en cours | commits directs ou branches de travail fusionnées |
+| `main` | code final, publié | **pull request depuis `dev` uniquement** |
+| `gh-pages` | version publiée du site, servie par GitHub Pages | **l'Action de déploiement uniquement**, ne jamais y écrire à la main |
 
-- Créez une branche de travail à partir de `main`, avec un préfixe adapté (`feat/`, `fix/`, `docs/` ou `chore/`).
-- Proposez les changements par pull request vers `main` ; évitez les commits directs sur `main`.
-- Décrivez dans la PR le contexte, les changements, la validation exécutée et l'impact utilisateur ou technique. Gardez une PR limitée à un objectif cohérent.
-- Lancez `npm test` avant de publier la PR. Si une vérification échoue, corrigez-la ou expliquez clairement le blocage.
-- Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJECT.md` pour l'expérience utilisateur, `README.md` pour le développement et la contribution, `CONTEXT.md` pour les règles et le contexte technique. Consultez la matrice détaillée de `CONTEXT.md`.
+Déroulé :
 
-Ces règles sont des conventions de dépôt, pas des protections GitHub configurées. Aucun workflow GitHub Actions n'est présent actuellement. Si des Actions sont ajoutées, elles doivent au minimum exécuter `npm test` sur les pull requests et les changements de `main`, sans introduire d'étape de build ni de dépendance d'exécution. Ne pas présenter un contrôle comme actif tant qu'il n'existe pas dans le dépôt ou dans les paramètres GitHub.
+1. Travaillez sur `dev`, ou sur une branche courte créée depuis `dev` (`feat/`, `fix/`, `docs/`, `chore/`) puis fusionnée dans `dev`.
+2. Quand `dev` est prête, ouvrez une pull request `dev` → `main`. Décrivez le contexte, les changements, la validation exécutée et l'impact.
+3. L'Action **Tests** doit passer sur la PR. Fusionnez-la.
+4. Le merge déclenche l'Action **Déploiement GitHub Pages**, qui publie le site.
+
+Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJECT.md` pour l'expérience utilisateur, `README.md` pour le développement et la contribution, `CONTEXT.md` pour les règles et le contexte technique. Consultez la matrice détaillée de `CONTEXT.md`.
+
+### Actions
+
+- `.github/workflows/tests.yml` (**Tests**) : `npm test` à chaque push sur `dev` et sur chaque pull request vers `main`.
+- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `css/`, `js/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
+
+La version en ligne est consultable à `https://<utilisateur>.github.io/<repo>/version.json`.
+
+### Réglages GitHub (à faire une fois, dans l'interface)
+
+Ces réglages vivent dans GitHub, pas dans le dépôt : vérifiez-les dans **Settings** avant de les tenir pour acquis.
+
+1. **Protection de `main`** : *Settings > Rules > Rulesets > New branch ruleset*. Cible : `main` (*Include default branch*). Règles : *Restrict deletions*, *Block force pushes*, *Require a pull request before merging*, *Require status checks to pass* avec le contrôle **Tests**. Statut : *Active*.
+2. **Publication** : après le premier déploiement, *Settings > Pages > Build and deployment > Source : Deploy from a branch*, branche `gh-pages`, dossier `/ (root)`.
+3. **Droits de l'Action** : *Settings > Actions > General > Workflow permissions* peut rester sur *Read repository contents* : le workflow de déploiement demande lui-même l'écriture (`permissions: contents: write`).
 
 ## Déploiement GitHub Pages
 
-Le site est prévu pour être publié depuis la branche `main`, dossier `/ (root)` : dans **Settings > Pages**, sélectionnez **Deploy from a branch**, puis `main` et `/ (root)`. `index.html` doit rester à la racine. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
+Le site est servi depuis la branche `gh-pages`, alimentée par l'Action de déploiement à chaque merge dans `main` (voir ci-dessus). `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, `css/` et `js/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
 
-GitHub Pages fournit HTTPS, requis pour la géolocalisation. Le dépôt ne contient pas actuellement de workflow de déploiement Actions.
+GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossier doit être servi (images, manifeste…), ajoutez-le à l'étape « Assembler le site » de `deploy.yml`.
 
 ## Architecture
 
