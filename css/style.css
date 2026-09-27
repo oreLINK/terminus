@@ -1,0 +1,833 @@
+/* Terminus : lisible d'une main, la nuit, sur un trottoir.
+   Un seul élément fort, l'heure à laquelle partir, couleur lampadaire au sodium. */
+
+:root {
+  --bg: #F3F5F7;
+  --surface: #FFFFFF;
+  --ink: #12202E;
+  --muted: #4D5B69;
+  --rule: #D3DAE1;
+  --accent: #8F5400;
+  --accent-ink: #FFFFFF;
+  --soon: #A34700;
+  --urgent: #B3261E;
+  --live: #1D6B3A;
+
+  /* Tons du compte à rebours */
+  --tone-ok: #1D6B3A;
+  --tone-soon: #A34700;
+  --tone-urgent: #B3261E;
+  --tone-none: #4D5B69;
+  --late-bg: #000000;
+  --late-ink: #FFFFFF;
+  --late-muted: #B8C2CC;
+
+  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-panel: 18px;
+  --radius-control: 12px;
+  --measure: 36rem;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12202E;
+    --surface: #1A2C3E;
+    --ink: #EEF2F5;
+    --muted: #A5B4C2;
+    --rule: #2C4257;
+    --accent: #FFB547;
+    --accent-ink: #12202E;
+    --soon: #FF9A3D;
+    --urgent: #FF7B6E;
+    --live: #6FD597;
+
+    --tone-ok: #6FD597;
+    --tone-soon: #FF9A3D;
+    --tone-urgent: #FF7B6E;
+    --tone-none: #A5B4C2;
+    --late-bg: #000000;
+    --late-ink: #EEF2F5;
+    --late-muted: #A5B4C2;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+p,
+h1,
+h2,
+ol,
+ul {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ---------- En-tête et pied ---------- */
+
+.masthead,
+main,
+.site-footer {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: 1rem 0.5rem;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.625rem;
+  letter-spacing: 0.01em;
+}
+
+/* Le logo : une fin de ligne telle qu'on la dessine sur un plan de tram,
+   un trait qui s'arrête sur une barre. */
+.wordmark::before {
+  content: "";
+  width: 1.1em;
+  height: 0.75em;
+  background: linear-gradient(var(--accent), var(--accent)) left center / 100% 0.2em no-repeat;
+  border-right: 0.22em solid var(--accent);
+  border-radius: 0 0.08em 0.08em 0;
+}
+
+/* Sélecteurs de ville et d'information, en haut à droite. */
+.pickers {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.625rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.picker > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Petits téléphones : logo et sélecteurs plus compacts, sans défilement horizontal. */
+@media (max-width: 374px) {
+  .wordmark {
+    font-size: 1.3125rem;
+  }
+
+  .picker {
+    padding-inline: 0.5rem;
+  }
+
+  .picker-icon {
+    display: none;
+  }
+}
+
+.picker:hover {
+  border-color: var(--muted);
+}
+
+.picker-icon {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-block: 0.5rem 2rem;
+}
+
+.site-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-block: 1.25rem 1.75rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* ---------- Écran principal : le compte à rebours, puis l'arrêt et le domicile ---------- */
+
+/* L'écran tient dans la hauteur du téléphone : l'heure au centre, les réglages sous le pouce. */
+.screen {
+  min-height: calc(100vh - 5rem);
+  min-height: calc(100dvh - 5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Le ton colore les chiffres et teinte légèrement le fond du bloc.
+   Gris quand une information manque, noir quand c'est trop tard. */
+.hero {
+  --tone: var(--tone-none);
+  flex: 1;
+  border-radius: 28px;
+  padding-inline: 1rem;
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  transition: background-color 0.4s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding-block: 1.5rem;
+  text-align: center;
+}
+
+.hero-label {
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.countdown {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(7rem, 44vw, 12rem);
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--tone);
+  white-space: nowrap;
+  transition: color 0.4s ease, opacity 0.3s ease;
+}
+
+.countdown-unit {
+  font-size: 0.3em;
+  font-weight: 500;
+  letter-spacing: 0;
+  margin-inline: 0.08em;
+}
+
+.countdown-empty {
+  opacity: 0.6;
+}
+
+.countdown-word {
+  font-size: 0.4em;
+}
+
+.tone-ok {
+  --tone: var(--tone-ok);
+}
+
+.tone-soon {
+  --tone: var(--tone-soon);
+}
+
+.tone-urgent {
+  --tone: var(--tone-urgent);
+}
+
+.tone-none {
+  --tone: var(--tone-none);
+  background: color-mix(in srgb, var(--tone) 7%, transparent);
+}
+
+.tone-late {
+  --tone: var(--late-ink);
+  background: var(--late-bg);
+  color: var(--late-ink);
+}
+
+.tone-late .hero-label,
+.tone-late .hero-note,
+.tone-late .hero-source {
+  color: var(--late-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .is-pulsing .countdown {
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.hero-sub {
+  font-size: 1.125rem;
+  max-width: 22em;
+  text-wrap: balance;
+}
+
+/* Estimé ou temps réel : un point devant, vert quand le tram est suivi en direct. */
+.hero-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.hero-source::before {
+  content: "";
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+}
+
+.hero-source.is-live {
+  color: var(--live);
+  font-weight: 700;
+}
+
+.hero-source.is-live::before {
+  background: currentColor;
+}
+
+.hero-note {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  max-width: 26em;
+  text-wrap: balance;
+}
+
+/* Calcul en cours : les chiffres s'estompent à peine et un segment glisse sur une ligne,
+   comme un tram. Sans animation si le mouvement est réduit : la ligne reste, pleine. */
+.progress {
+  position: relative;
+  width: min(10rem, 50%);
+  height: 3px;
+  margin-top: 0.75rem;
+  border-radius: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--tone) 22%, transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.progress::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: inherit;
+  background: var(--tone);
+}
+
+.is-computing .progress {
+  opacity: 1;
+}
+
+.is-computing .countdown {
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .is-computing .progress::after {
+    animation: ride 1.3s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress::after {
+    width: 100%;
+    opacity: 0.6;
+  }
+}
+
+@keyframes ride {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+.hero-quiet .hero-label {
+  color: var(--muted);
+}
+
+.hero-big {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(3rem, 14vw, 4.5rem);
+  line-height: 1;
+}
+
+.hero-quiet .button {
+  margin-top: 0.5rem;
+}
+
+/* Les deux réglages, côte à côte, discrets : un pictogramme, un nom, une précision. */
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+@media (max-width: 340px) {
+  .choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  min-height: 3.25rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--muted);
+}
+
+.choice-icon {
+  flex: none;
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.choice-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.choice-value {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.choice-value {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  line-height: 1.3;
+}
+
+.choice-value .line-badge {
+  font-size: 0.875rem;
+  vertical-align: 0.1em;
+}
+
+.choice-detail {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Domicile manquant : la carte s'allume et une annotation la désigne. */
+.choice-missing {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+.choice-missing .choice-value,
+.choice-missing .choice-detail {
+  color: var(--accent);
+}
+
+.choice-missing .choice-icon {
+  stroke: var(--accent);
+}
+
+.callout {
+  position: relative;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+/* La pointe vise le centre de la carte Domicile, colonne de droite. */
+.callout::after {
+  content: "";
+  position: absolute;
+  bottom: -0.5rem;
+  right: calc(25% - 0.6875rem);
+  border: 0.5rem solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--accent);
+}
+
+/* Position manquante : la pointe vise la carte Arrêt, colonne de gauche. */
+.callout-position::after {
+  right: auto;
+  left: calc(25% - 0.6875rem);
+}
+
+@media (max-width: 340px) {
+  .callout::after {
+    display: none;
+  }
+}
+
+/* ---------- Badges de ligne ---------- */
+
+.line-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.6em;
+  height: 1.6em;
+  padding-inline: 0.2em;
+  border-radius: 0.35em;
+  background: var(--line, var(--ink));
+  color: var(--line-ink, var(--bg));
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1em;
+  line-height: 1;
+  vertical-align: 0.05em;
+}
+
+.line-badge + .line-badge {
+  margin-left: 0.2em;
+}
+
+/* ---------- Méta et messages ---------- */
+
+.meta {
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.warning {
+  color: var(--soon);
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+.message {
+  padding-block: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.message-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.message-text {
+  color: var(--muted);
+  max-width: 32em;
+}
+
+/* ---------- Formulaires ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field-label {
+  font-weight: 700;
+}
+
+.combo {
+  position: relative;
+}
+
+.field-input {
+  width: 100%;
+  font: inherit;
+  font-size: 1.125rem;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-control);
+  padding: 0.8rem 0.9rem;
+}
+
+.field-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.field-input::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  min-height: 1.4em;
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  list-style: none;
+  padding: 0.25rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-control);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.22);
+}
+
+.suggestions li {
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.suggestions li:hover,
+.suggestions li[aria-selected="true"] {
+  background: var(--bg);
+}
+
+.button {
+  font: inherit;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: 999px;
+  padding: 0.7rem 1.25rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.button-quiet {
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--rule);
+}
+
+.link-button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0.25rem 0;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+/* ---------- Feuille de réglage ---------- */
+
+.sheet {
+  width: 100%;
+  max-width: var(--measure);
+  max-height: 88vh;
+  max-height: 88dvh;
+  margin: auto auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.sheet::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.sheet-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+  background: var(--surface);
+  border-radius: 22px 22px 0 0;
+  padding: 1rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet[open] .sheet-panel {
+    animation: sheet-in 0.22s ease-out;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(40%);
+    opacity: 0;
+  }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.75rem;
+}
+
+.sheet-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.75rem;
+  line-height: 1.1;
+}
+
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-text {
+  color: var(--muted);
+}
+
+.sheet-options {
+  list-style: none;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sheet-option {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: 2px solid var(--rule);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.sheet-option[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+.sheet-option-main {
+  font-weight: 700;
+}
+
+.sheet-option-detail {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.sheet-field {
+  width: 100%;
+}
+
+/* Dans la feuille, les suggestions poussent le contenu au lieu de flotter. */
+.sheet .suggestions {
+  position: static;
+  margin-top: 0.25rem;
+  max-height: none;
+  box-shadow: none;
+}
