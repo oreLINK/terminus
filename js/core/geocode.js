@@ -7,6 +7,7 @@ import { inBounds } from "./util.js";
 
 const COMPLETION_URL = "https://data.geopf.fr/geocodage/completion/";
 const SEARCH_URL = "https://data.geopf.fr/geocodage/search";
+const REVERSE_URL = "https://data.geopf.fr/geocodage/reverse";
 const MAX_RESULTS = 7;
 
 export async function suggestAddresses(text, { area, types = "StreetAddress", signal } = {}) {
@@ -57,6 +58,17 @@ async function viaSearch(text, area, signal) {
 }
 
 // Toute coordonnée hors de la zone du réseau est écartée.
+// Adresse la plus proche d'un point (géocodage inverse), ou null.
+// Réponse GeoJSON vérifiée le 27/09/2026 : features[0].properties.{ label, name, city }.
+export async function reverseAddress({ lat, lon }, { signal } = {}) {
+  const url = new URL(REVERSE_URL);
+  url.search = new URLSearchParams({ lat: String(lat), lon: String(lon), index: "address", limit: "1" });
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Le service d'adresses a répondu ${res.status}.`);
+  const p = (await res.json()).features?.[0]?.properties;
+  return p?.label ? { label: p.label, name: p.name || p.label } : null;
+}
+
 function unique(items, area) {
   const seen = new Set();
   return items.filter((a) => {
