@@ -21,9 +21,9 @@ const PULSE_MIN = 5;
 // Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
 // une maison pour le domicile.
 const ICONS = {
-  here: `<svg class="choice-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/></svg>`,
-  stop: `<svg class="choice-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="15" rx="3"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3M10 6.5h4"/><circle cx="8.5" cy="14.5" r=".6"/><circle cx="15.5" cy="14.5" r=".6"/></svg>`,
-  home: `<svg class="choice-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>`,
+  here: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/></svg>`,
+  stop: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="15" rx="3"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3M10 6.5h4"/><circle cx="8.5" cy="14.5" r=".6"/><circle cx="15.5" cy="14.5" r=".6"/></svg>`,
+  home: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>`,
 };
 
 // Barre fine où glisse un segment, comme un tram sur sa ligne : visible pendant un calcul.
@@ -100,9 +100,10 @@ function mount({ root, network, adapter }) {
     const body = openSheet(
       "Votre position",
       `
-      <p class="sheet-text">${known ? `${esc(known)}${location.here?.source === "gps" ? " (GPS)" : ""}` : esc(reason)}</p>
       <div class="sheet-field"></div>
-      <button type="button" class="button button-quiet" data-action="retry-gps">Réessayer la localisation</button>`,
+      <button type="button" class="button button-quiet" data-action="retry-gps">Utiliser ma localisation</button>
+      <p class="sheet-text">${known ? `Actuellement : ${esc(known)}${location.here?.source === "gps" ? " (GPS)" : ""}` : esc(reason)}</p>`,
+      { tall: true },
     );
     createAddressField(body.querySelector(".sheet-field"), {
       label: "Où êtes-vous ?",
@@ -294,7 +295,8 @@ function mount({ root, network, adapter }) {
       <section class="hero tone-ok" id="hero">
         <p class="hero-label" id="hero-label">Partez dans</p>
         <p class="countdown" id="countdown"></p>
-        <p class="hero-sub">Avant ${clock(option.leaveBy)}, pour le dernier ${esc(adapter.vehicle)} ${badges([last.lineCode])} de ${clock(last.dep)}</p>
+        <p class="hero-sub">avant <strong class="hero-time">${clock(option.leaveBy)}</strong></p>
+        <p class="hero-line">Dernier ${esc(adapter.vehicle)} ${badges([last.lineCode])} à ${clock(last.dep)}</p>
         ${
           last.depLive
             ? `<p class="hero-source is-live">Temps réel</p>`
@@ -365,39 +367,42 @@ function mount({ root, network, adapter }) {
       home: "Indiquez votre domicile pour savoir quand partir.",
       position: "Indiquez où vous êtes pour savoir quand partir.",
     };
-    const missing = (what) => (needs === what ? " choice-missing" : "");
-    const describedBy = (what) => (needs === what ? ' aria-describedby="callout"' : "");
     const home = state.home
       ? { value: esc(state.home.label.split(",")[0]), detail: homeDetail }
-      : { value: "Non renseigné", detail: "Touchez pour l'indiquer" };
-    const block = (what, action, icon, label, value, detail, extra = "", ids = {}) => `
-      <div class="choice${missing(what)}">
-        <button type="button" class="choice-button" data-action="${action}" aria-haspopup="dialog"${describedBy(what)}>
-          <span class="choice-head">${icon}<span class="choice-label">${label}</span></span>
-          <span class="choice-value"${ids.value ? ` id="${ids.value}"` : ""}>${value}</span>
-          <span class="choice-detail"${ids.detail ? ` id="${ids.detail}"` : ""}>${detail}</span>
+      : { value: "Non renseigné", detail: "Touchez pour indiquer votre adresse" };
+    // L'annotation se place juste au-dessus de la ligne qui manque.
+    const callout = (what) =>
+      needs === what ? `<li class="trip-callout" id="callout">${calloutText[what]}</li>` : "";
+    const row = (what, action, icon, label, value, detail, { link = "", ids = {} } = {}) => `
+      <li class="trip-row trip-${what}${needs === what ? " is-missing" : ""}">
+        <button type="button" class="trip-button" data-action="${action}" aria-haspopup="dialog"${
+          needs === what ? ' aria-describedby="callout"' : ""
+        }>
+          <span class="trip-icon">${icon}</span>
+          <span class="trip-text">
+            <span class="trip-label">${label}</span>
+            <span class="trip-value"${ids.value ? ` id="${ids.value}"` : ""}>${value}</span>
+            <span class="trip-detail"${ids.detail ? ` id="${ids.detail}"` : ""}>${detail}</span>
+          </span>
         </button>
-        ${extra}
-      </div>`;
+        ${link}
+      </li>`;
     root.innerHTML = `
       <div class="screen">
         ${hero}
-        ${needs ? `<p class="callout callout-${needs}" id="callout">${calloutText[needs]}</p>` : ""}
-        <div class="choices">
-          ${block("position", "open-position", ICONS.here, "Votre position", "", "", "", { value: "position-value", detail: "position-detail" })}
-          ${block(
-            "station",
-            "open-station",
-            ICONS.stop,
-            "Arrêt proche",
-            station.value,
-            station.detail,
-            station.route
-              ? `<a class="choice-link" href="${station.route}" target="_blank" rel="noopener">Itinéraire à pied</a>`
+        <ol class="trip" aria-label="Votre trajet">
+          ${callout("position")}
+          ${row("position", "open-position", ICONS.here, "Votre position", "", "", {
+            ids: { value: "position-value", detail: "position-detail" },
+          })}
+          ${row("station", "open-station", ICONS.stop, "Arrêt proche", station.value, station.detail, {
+            link: station.route
+              ? `<a class="trip-link" href="${station.route}" target="_blank" rel="noopener">Itinéraire<span class="visually-hidden"> à pied jusqu'à l'arrêt (Google Maps)</span></a>`
               : "",
-          )}
-          ${block("home", "open-home", ICONS.home, "Domicile", home.value, home.detail)}
-        </div>
+          })}
+          ${callout("home")}
+          ${row("home", "open-home", ICONS.home, "Domicile", home.value, home.detail)}
+        </ol>
         ${partial ? `<p class="warning">Certaines lignes n'ont pas répondu : le résultat peut être incomplet.</p>` : ""}
         ${
           meta
@@ -569,17 +574,18 @@ function mount({ root, network, adapter }) {
     const body = openSheet(
       "Adresse du domicile",
       `
+      <div class="sheet-field"></div>
       <p class="sheet-text">${
         state.home
-          ? esc(state.home.label)
+          ? `Actuellement : ${esc(state.home.label)}`
           : "Terminus cherche le tram qui vous ramène au plus près de chez vous. Votre adresse reste enregistrée dans ce navigateur uniquement."
       }</p>
       ${
         dest
           ? `<a class="sheet-link" href="${walkLink(dest.station, state.home)}" target="_blank" rel="noopener">Itinéraire à pied depuis ${esc(dest.station.name)}</a>`
           : ""
-      }
-      <div class="sheet-field"></div>`,
+      }`,
+      { tall: true },
     );
     const field = createAddressField(body.querySelector(".sheet-field"), {
       label: state.home ? "Nouvelle adresse" : "Votre adresse",

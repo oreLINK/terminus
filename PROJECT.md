@@ -15,7 +15,7 @@ En haut à droite, deux boutons règlent ce que Terminus vous montre :
 2. Autorisez la localisation pour indiquer automatiquement où vous vous trouvez. Si elle n'est pas disponible, vous pouvez saisir votre position ou choisir un lieu.
 3. Terminus recherche les arrêts de tram proches de votre position et de votre domicile, puis les trajets directs possibles.
 4. L'écran principal affiche en très grand le temps qu'il vous reste avant de partir à pied pour attraper le dernier tram. Il se met à jour tout seul.
-5. Sous ce compte à rebours, trois informations : votre position (son adresse), l'arrêt proche avec le temps de marche et un lien vers l'itinéraire à pied, et votre domicile. Touchez-en une pour la modifier : réessayer la localisation ou saisir votre adresse actuelle, choisir un autre arrêt, changer de domicile.
+5. Sous ce compte à rebours, votre trajet en trois lignes, de haut en bas : votre position (son adresse), l'arrêt proche avec le temps de marche et un bouton vers l'itinéraire à pied, puis votre domicile. Touchez-en une pour la modifier : réessayer la localisation ou saisir votre adresse actuelle, choisir un autre arrêt, changer de domicile.
 
 Vous pouvez aussi actualiser les horaires ou corriger votre position (« Je ne suis pas ici », dans le choix de l'arrêt). Si votre position est inconnue (localisation refusée ou introuvable), le compte à rebours reste en attente et « Votre position » vous invite à indiquer où vous êtes, ou à réessayer la localisation.
 
