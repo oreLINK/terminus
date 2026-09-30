@@ -393,7 +393,7 @@ main,
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding-block: 1rem 0.5rem;
+  padding-block: 1rem 1.25rem;
 }
 
 .wordmark {
@@ -515,7 +515,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  padding-block: 0.5rem 1.75rem;
+  padding-block: 2.5rem 2rem;
   color: var(--muted);
   font-size: 0.875rem;
   align-items: center;
@@ -540,13 +540,14 @@ main {
 /* ---------- Écran principal : le compte à rebours, puis l'arrêt et le domicile ---------- */
 
 /* L'écran tient dans la hauteur du téléphone : l'heure au centre, les réglages sous le pouce. */
-/* Hauteur de l'écran moins l'en-tête (4,25rem) et les marges de <main> (1,25rem). */
+/* Hauteur de l'écran moins l'en-tête et les marges : la tuile, la bande et « Mis à jour »
+   se partagent le reste, séparés par de larges espaces. */
 .screen {
-  min-height: calc(100vh - 5.5rem);
-  min-height: calc(100dvh - 5.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  min-height: calc(100vh - 6.25rem);
+  min-height: calc(100dvh - 6.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.5rem;
 }
 
 /* Le ton colore les chiffres ; toute la fenêtre porte la couleur de la situation (.ambient).
@@ -857,14 +858,16 @@ main {
 
 .route-step {
   display: grid;
-  grid-template-columns: 2.9rem 1.25rem minmax(0, 1fr) auto;
+  /* Le texte prend sa largeur, pas toute la place : le bouton d'action le suit de près. */
+  grid-template-columns: 2.9rem 1.25rem minmax(0, max-content) auto;
+  justify-content: start;
   column-gap: 0.5rem;
   align-items: center;
-  min-height: 2.375rem;
+  min-height: 2.75rem;
 }
 
 .route-step.is-ride {
-  min-height: 2.125rem;
+  min-height: 2.5rem;
 }
 
 .route-time {
@@ -983,6 +986,7 @@ main {
   width: 2.25rem;
   height: 2.25rem;
   margin-block: -0.25rem;
+  margin-left: 0.125rem;
   border-radius: 50%;
   color: var(--ink);
   background: var(--glass-bg);
@@ -1017,7 +1021,7 @@ main {
 /* De l'air entre la tuile du temps et la bande (ou l'annotation qui la précède). */
 .hero + .trip,
 .hero + .trip-callout {
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .trip {
@@ -1121,7 +1125,7 @@ main {
 /* Écrans courts (iPhone SE, petits Android) : tout tient sans défiler. */
 @media (max-height: 700px) {
   .screen {
-    gap: 0.5rem;
+    gap: 1rem;
   }
 
   .hero {
@@ -1146,11 +1150,11 @@ main {
   }
 
   .route-step {
-    min-height: 2rem;
+    min-height: 2.25rem;
   }
 
   .route-step.is-ride {
-    min-height: 1.75rem;
+    min-height: 2rem;
   }
 
   .trip-icon {
@@ -1229,7 +1233,7 @@ main {
 /* ---------- Méta et messages ---------- */
 
 .meta {
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1239,32 +1243,32 @@ main {
   font-size: 0.875rem;
 }
 
-.meta-refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-height: 2.75rem;
-  padding: 0.25rem 0.875rem;
-  font: inherit;
-  font-weight: 700;
+/* Actualiser : un rond de verre en haut à droite de la tuile du temps. */
+.hero-refresh {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
   color: var(--ink);
   background: var(--glass-bg);
   border: 1px solid var(--glass-edge);
-  border-radius: 999px;
-  box-shadow: inset 0 1px 0 var(--glass-sheen);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  border-radius: 50%;
+  box-shadow: inset 0 1px 0 var(--glass-sheen), 0 3px 10px rgb(0 0 0 / 0.06);
   cursor: pointer;
   transition: transform 0.15s ease;
 }
 
-.meta-refresh:active {
-  transform: scale(0.97);
+.hero-refresh:active {
+  transform: scale(0.94);
 }
 
 .meta-glyph {
-  width: 1rem;
-  height: 1rem;
+  width: 1.125rem;
+  height: 1.125rem;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -1272,7 +1276,7 @@ main {
   stroke-linejoin: round;
 }
 
-/* Pendant un calcul, la flèche d'actualisation tourne. */
+/* Pendant un calcul, la flèche d'actualisation tourne, jusqu'à la fin du chargement. */
 @media (prefers-reduced-motion: no-preference) {
   .is-computing .meta-glyph {
     animation: spin 1s linear infinite;
