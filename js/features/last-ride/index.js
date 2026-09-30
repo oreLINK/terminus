@@ -23,7 +23,6 @@ const PULSE_MIN = 5;
 // une maison pour le domicile.
 const ICONS = {
   here: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/></svg>`,
-  stop: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="15" rx="3"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3M10 6.5h4"/><circle cx="8.5" cy="14.5" r=".6"/><circle cx="15.5" cy="14.5" r=".6"/></svg>`,
   home: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>`,
   go: `<svg class="route-go-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7 7-16Z"/></svg>`,
   refresh: `<svg class="meta-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>`,
@@ -68,7 +67,6 @@ function mount({ root, network, adapter }) {
     state.last = null;
     renderScreen({
       hero: heroPending("Ajoutez votre domicile pour lancer le calcul."),
-      station: { value: "En attente" },
       meta: false,
     });
   }
@@ -77,7 +75,6 @@ function mount({ root, network, adapter }) {
   function showMessage(title, text = "") {
     renderScreen({
       hero: heroPending(esc(title), esc(text)),
-      station: { value: "Recherche…" },
       meta: false,
     });
   }
@@ -88,7 +85,6 @@ function mount({ root, network, adapter }) {
     state.last = null;
     renderScreen({
       hero: heroPending(esc(title), esc(reason)),
-      station: { value: "En attente" },
       needPosition: true,
       meta: false,
     });
@@ -337,8 +333,15 @@ function mount({ root, network, adapter }) {
       const before = i === 0 ? "walk" : legs[i - 1].lineCode;
       const note =
         i === 0
-          ? `<span class="route-tag">Dernier ${esc(adapter.vehicle)}</span>`
+          ? isPinned(option)
+            ? `<span class="route-note">choisi par vous</span>`
+            : ""
           : `<span class="route-note">correspondance</span>`;
+      // L'arrêt de départ se touche pour en choisir un autre (feuille Arrêt de départ).
+      const name =
+        i === 0
+          ? `<button type="button" class="route-stop route-stop-button" data-action="open-station" aria-haspopup="dialog">${esc(leg.from.name)}<span class="visually-hidden">, changer d'arrêt</span></button>`
+          : `<strong class="route-stop">${esc(leg.from.name)}</strong>`;
       steps.push(
         step({
           time: clock(leg.dep),
@@ -346,7 +349,7 @@ function mount({ root, network, adapter }) {
           bottom: leg.lineCode,
           dot: "is-stop",
           dotLine: leg.lineCode,
-          body: `<strong class="route-stop">${esc(leg.from.name)}</strong> ${note}`,
+          body: `${name} ${note}`,
           // Depuis la position actuelle jusqu'à l'arrêt de départ, dans Google Maps.
           action:
             i === 0
@@ -498,7 +501,6 @@ function mount({ root, network, adapter }) {
 
   function renderScreen({
     hero,
-    station,
     now = Date.now(),
     partial = false,
     leaveBy = null,
@@ -515,10 +517,10 @@ function mount({ root, network, adapter }) {
     const home = state.home
       ? esc(state.home.label.split(",")[0])
       : "Non renseigné";
-    // Trois colonnes côte à côte, dans l'ordre du déplacement. L'annotation, au-dessus de la bande,
-    // pointe vers la colonne qui manque (--col : 0 position, 2 domicile).
+    // Deux colonnes côte à côte, d'où vous partez et où vous rentrez. L'annotation, au-dessus de la bande,
+    // pointe vers la colonne qui manque (--col : 0 position, 1 domicile).
     const callout = needs
-      ? `<p class="trip-callout" id="callout" style="--col: ${needs === "position" ? 0 : 2}">${calloutText[needs]}</p>`
+      ? `<p class="trip-callout" id="callout" style="--col: ${needs === "position" ? 0 : 1}">${calloutText[needs]}</p>`
       : "";
     // Deux lignes par colonne : l'intitulé et la valeur. Le reste (marche, descente) est dans l'itinéraire.
     const col = (what, action, icon, label, value, id = "") => `
@@ -537,7 +539,6 @@ function mount({ root, network, adapter }) {
         ${callout}
         <ol class="trip" aria-label="Votre trajet">
           ${col("position", "open-position", ICONS.here, "Position", "", "position-value")}
-          ${col("station", "open-station", ICONS.stop, station.label ?? "Arrêt proche", station.value)}
           ${col("home", "open-home", ICONS.home, "Domicile", home)}
         </ol>
         ${partial ? `<p class="warning">Certaines lignes n'ont pas répondu : le résultat peut être incomplet.</p>` : ""}
@@ -559,7 +560,7 @@ function mount({ root, network, adapter }) {
   }
 
   function renderLast() {
-    const { result, origins, now, partial } = state.last;
+    const { result, now, partial } = state.last;
     const option = chosenOption(result);
     const night = network.nightHint ? ` ${network.nightHint}` : "";
 
@@ -600,25 +601,12 @@ function mount({ root, network, adapter }) {
       );
     }
 
-    let station;
-    if (option) {
-      station = {
-        label: isPinned(option) ? "Arrêt choisi" : "Arrêt proche",
-        value: `${badges(option.lineCodes)} ${esc(option.origin.station.name)}`,
-      };
-    } else {
-      // Le compteur explique pourquoi il n'y a pas de tram : ici, l'arrêt le plus proche suffit.
-      const near = origins[0];
-      station = { value: near ? esc(near.station.name) : "Aucun" };
-    }
-
-    renderScreen({ hero, station, now, partial, leaveBy });
+    renderScreen({ hero, now, partial, leaveBy });
   }
 
   function renderAtHome() {
     renderScreen({
       hero: heroText("Vous y êtes", "À deux pas de chez vous"),
-      station: { value: "Inutile" },
     });
   }
 
@@ -631,7 +619,6 @@ function mount({ root, network, adapter }) {
         esc(text),
         `<button type="button" class="button" data-action="refresh">Réessayer</button>`,
       ),
-      station: { value: "Inconnu" },
     });
   }
 
