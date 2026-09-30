@@ -860,11 +860,11 @@ main {
   grid-template-columns: 2.9rem 1.25rem minmax(0, 1fr) auto;
   column-gap: 0.5rem;
   align-items: center;
-  min-height: 1.75rem;
+  min-height: 2.375rem;
 }
 
 .route-step.is-ride {
-  min-height: 1.625rem;
+  min-height: 2.125rem;
 }
 
 .route-time {
@@ -941,6 +941,21 @@ main {
   font-weight: 700;
 }
 
+/* L'arrêt de départ ouvre la feuille « Arrêt de départ » : souligné en pointillé, comme un choix. */
+.route-stop-button {
+  padding: 0.5rem 0;
+  margin-block: -0.5rem;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+
 .is-ride .route-body {
   color: var(--muted);
   font-size: 0.875rem;
@@ -949,18 +964,6 @@ main {
 .is-ride .line-badge {
   font-size: 0.8125rem;
   vertical-align: 0.05em;
-}
-
-.route-tag {
-  display: inline-block;
-  margin-left: 0.25rem;
-  padding: 0 0.4em;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--tone) 18%, transparent);
-  color: var(--ink);
-  font-size: 0.75rem;
-  font-weight: 700;
-  vertical-align: 0.1em;
 }
 
 .route-note {
@@ -1008,8 +1011,9 @@ main {
   stroke-linejoin: round;
 }
 
-/* Le trajet sous le compteur : position → arrêt proche → domicile, côte à côte, posés sur le
-   fond. Deux lignes par colonne (intitulé, valeur) ; chaque colonne ouvre sa feuille. */
+/* Sous le compteur : position et domicile, côte à côte, posés sur le fond. Deux lignes par
+   colonne (intitulé, valeur) ; chaque colonne ouvre sa feuille. L'arrêt de départ se choisit en
+   touchant son nom dans l'itinéraire. */
 /* De l'air entre la tuile du temps et la bande (ou l'annotation qui la précède). */
 .hero + .trip,
 .hero + .trip-callout {
@@ -1021,7 +1025,7 @@ main {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .trip-col {
@@ -1142,11 +1146,11 @@ main {
   }
 
   .route-step {
-    min-height: 1.5rem;
+    min-height: 2rem;
   }
 
   .route-step.is-ride {
-    min-height: 1.3125rem;
+    min-height: 1.75rem;
   }
 
   .trip-icon {
@@ -1185,7 +1189,7 @@ main {
   content: "";
   position: absolute;
   bottom: -0.5rem;
-  left: calc((100% / 3) * (var(--col) + 0.5) - 0.5rem);
+  left: calc((100% / 2) * (var(--col) + 0.5) - 0.5rem);
   border: 0.5rem solid transparent;
   border-bottom: 0;
   border-top-color: var(--accent);
@@ -1593,7 +1597,6 @@ main {
 /* Choix en cours : liseré d'accent et coche à droite. */
 .sheet-option[aria-pressed="true"] {
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, color-mix(in srgb, var(--surface) 70%, transparent));
 }
 
@@ -1609,10 +1612,17 @@ main {
   transform: translateY(-60%) rotate(45deg);
 }
 
-/* Focus au clavier dans les feuilles : un anneau fin, qui ne double pas le liseré du choix. */
+/* Focus au clavier dans les feuilles : un anneau fin. Sur le choix en cours (qui reçoit le focus
+   à l'ouverture), son liseré suffit : pas de second contour. */
 .sheet :focus-visible {
   outline-width: 2px;
   outline-offset: 2px;
+}
+
+.sheet-option[aria-pressed="true"]:focus-visible {
+  outline: none;
+  border-width: 2px;
+  padding: calc(0.75rem - 1px) calc(3rem - 1px) calc(0.75rem - 1px) calc(1rem - 1px);
 }
 
 .sheet-option-main {
