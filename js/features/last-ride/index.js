@@ -378,7 +378,9 @@ function mount({ root, network, adapter }) {
         top: "walk",
         dot: "is-end",
         kind: "home",
-        body: `<a class="route-link" href="${walkHome}" target="_blank" rel="noopener">Domicile, ${trip.dest.walk.minutes} min à pied</a>`,
+        body: `Domicile, ${trip.dest.walk.minutes} min à pied`,
+        // De la station d'arrivée jusqu'au domicile, dans Google Maps : le pendant du bouton de départ.
+        action: `<a class="route-go" href="${walkHome}" target="_blank" rel="noopener" aria-label="Itinéraire à pied de ${esc(final.to.name)} jusqu'au domicile (Google Maps)">${ICONS.go}</a>`,
       }),
     );
     return `<ol class="route" aria-label="Itinéraire du dernier trajet">${steps.join("")}</ol>`;
@@ -544,10 +546,7 @@ function mount({ root, network, adapter }) {
         ${partial ? `<p class="warning">Certaines lignes n'ont pas répondu : le résultat peut être incomplet.</p>` : ""}
         ${
           meta
-            ? `<p class="meta">
-                <span>Mis à jour à ${clock(now)}</span>
-                <button type="button" class="meta-refresh" data-action="refresh">${ICONS.refresh}Actualiser</button>
-              </p>`
+            ? `<p class="meta">Mis à jour à ${clock(now)}</p>`
             : ""
         }
       </div>`;
@@ -555,6 +554,16 @@ function mount({ root, network, adapter }) {
     const tone = root.querySelector(".hero")?.className.match(/tone-(\w+)/)?.[1] ?? "none";
     setAmbient(tone);
     state.entered = true;
+    // Actualiser : en haut à droite de la tuile, pictogramme seul. La flèche tourne tant que le
+    // calcul demandé est en cours (classe is-computing sur <body>, js/core/computing.js).
+    if (meta) {
+      root
+        .querySelector(".hero")
+        ?.insertAdjacentHTML(
+          "afterbegin",
+          `<button type="button" class="hero-refresh" data-action="refresh" aria-label="Actualiser les horaires">${ICONS.refresh}</button>`,
+        );
+    }
     paintPosition();
     paintCountdown();
   }
