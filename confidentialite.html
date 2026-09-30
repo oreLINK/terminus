@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Confidentialité, Terminus</title>
+  <meta name="description" content="Ce que Terminus fait de vos données : rien ne quitte votre navigateur, sauf les requêtes aux services publics de transport et d'adresses.">
+  <meta name="theme-color" content="#E7ECF0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#12202E" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312202E'/%3E%3Crect x='5' y='14' width='17' height='4' fill='%23FFB547'/%3E%3Crect x='21' y='8' width='5' height='16' rx='1' fill='%23FFB547'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/legal.js"></script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <header class="masthead">
+    <a class="wordmark" href="./" style="text-decoration: none">Terminus</a>
+  </header>
+
+  <main>
+    <article class="legal glass">
+      <a class="back-link" href="./">Retour à Terminus</a>
+      <h1>Confidentialité</h1>
+      <p class="legal-updated">Mise à jour le 30 septembre 2026.</p>
+
+      <p><strong>En bref :</strong> Terminus ne vous demande aucun compte, ne dépose aucun cookie, ne mesure pas l'audience et n'affiche aucune publicité. Il n'a pas de serveur à lui : ce que vous indiquez reste dans votre navigateur. L'éditeur ne reçoit et ne conserve aucune donnée vous concernant.</p>
+
+      <h2>Ce qui reste dans votre navigateur</h2>
+      <p>Terminus enregistre sur votre appareil, dans le stockage local du navigateur :</p>
+      <ul>
+        <li>l'adresse de votre domicile et ses coordonnées, pour calculer votre trajet à chaque visite ;</li>
+        <li>vos choix de ville et d'information ;</li>
+        <li>une copie de la liste des arrêts de tram, pour ne pas la recharger à chaque visite (renouvelée toutes les 24 heures).</li>
+      </ul>
+      <p>Ce stockage sert uniquement le service que vous demandez. Il ne sert pas à vous suivre : aucun bandeau de consentement n'est donc nécessaire. Vous pouvez l'effacer à tout moment.</p>
+      <p><button type="button" class="button button-quiet" id="erase">Effacer mes données de ce navigateur</button></p>
+      <p class="sheet-note" id="erase-status" role="status"></p>
+
+      <h2>Votre position</h2>
+      <p>Votre navigateur vous demande l'autorisation avant de la communiquer à Terminus. Elle sert à trouver les arrêts proches ; le calcul se fait dans votre navigateur et la position n'est pas enregistrée. Pour afficher l'adresse la plus proche, ses coordonnées sont envoyées au service de géocodage de l'IGN. Vous pouvez refuser ou retirer l'autorisation dans les réglages du navigateur, et saisir une adresse à la place.</p>
+
+      <h2>Services contactés par votre navigateur</h2>
+      <p>Pour fonctionner, votre navigateur contacte directement les services suivants. Comme pour toute connexion, ils reçoivent votre adresse IP et des informations techniques (type de navigateur), et les traitent selon leurs propres règles :</p>
+      <ul>
+        <li><strong>GitHub Pages</strong> (GitHub, Inc., États-Unis) : hébergement du site. GitHub peut conserver des journaux techniques de connexion.</li>
+        <li><strong>Bordeaux Métropole</strong> (flux SIRI-Lite du réseau TBM) : horaires et arrêts. Les requêtes ne contiennent que des références de lignes, jamais votre position ni votre adresse.</li>
+        <li><strong>IGN, Géoplateforme</strong> : suggestions d'adresses (le texte que vous tapez) et adresse de votre position (ses coordonnées).</li>
+        <li><strong>Google Maps</strong> : seulement si vous touchez un lien d'itinéraire. Il s'ouvre dans un nouvel onglet avec les points de départ et d'arrivée, dont votre domicile pour l'itinéraire depuis l'arrêt d'arrivée.</li>
+      </ul>
+      <p>Les polices de caractères sont hébergées avec le site : aucune requête n'est faite à Google Fonts.</p>
+
+      <h2>Vos droits</h2>
+      <p>L'éditeur ne détenant aucune donnée vous concernant, vos données se gèrent depuis votre navigateur (bouton ci-dessus, réglages de localisation). Pour les services tiers, adressez-vous à eux. Pour toute question : <a href="https://github.com/oreLINK/terminus/issues" rel="noopener">ouvrir une demande sur le dépôt du projet</a>. Vous pouvez aussi adresser une réclamation à la <a href="https://www.cnil.fr/fr/plaintes" rel="noopener">CNIL</a>.</p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <nav class="footer-links" aria-label="Informations légales">
+      <a href="mentions-legales.html">Mentions légales</a>
+      <a href="confidentialite.html" aria-current="page">Confidentialité</a>
+    </nav>
+  </footer>
+</body>
+</html>

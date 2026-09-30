@@ -1,5 +1,79 @@
 /* Terminus : lisible d'une main, la nuit, sur un trottoir.
-   Un seul élément fort, l'heure à laquelle partir, couleur lampadaire au sodium. */
+   Un seul élément fort, l'heure à laquelle partir. Toute la fenêtre prend la couleur de la
+   situation (vert, orange, rouge, noir), en camaïeu, sous des panneaux de verre. */
+
+/* Polices hébergées avec le site (fonts/, licence SIL OFL 1.1), sous-ensemble latin. */
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/atkinson-hyperlegible-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/atkinson-hyperlegible-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/barlow-condensed-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Barlow Condensed";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("../fonts/barlow-condensed-700.woff2") format("woff2");
+}
+
+/* Couleurs d'ambiance déclarées comme couleurs : le navigateur peut ainsi fondre l'une dans
+   l'autre quand le ton change, au lieu de basculer d'un coup. */
+@property --amb-1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #E7ECF0;
+}
+
+@property --amb-2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #D6DEE6;
+}
+
+@property --amb-3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #F1F4F7;
+}
+
+@property --amb-4 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #C9D3DD;
+}
+
+/* Texte et traits suivent le fond au même rythme : en passant au noir (« trop tard »), le texte
+   ne devient pas clair avant que le fond ait foncé. */
+@property --ink {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #12202E;
+}
+
+@property --muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #4D5B69;
+}
 
 :root {
   --bg: #F3F5F7;
@@ -12,6 +86,7 @@
   --soon: #A34700;
   --urgent: #B3261E;
   --live: #1D6B3A;
+  --live-dot: #E0262B;
 
   /* Tons du compte à rebours */
   --tone-ok: #1D6B3A;
@@ -24,6 +99,19 @@
 
   --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Verre : fond translucide, flou de ce qui passe dessous, reflet en haut, ombre douce. */
+  --glass-bg: rgb(255 255 255 / 0.52);
+  --glass-edge: rgb(255 255 255 / 0.75);
+  --glass-sheen: rgb(255 255 255 / 0.55);
+  --glass-shadow: 0 12px 32px rgb(18 32 46 / 0.12), 0 2px 6px rgb(18 32 46 / 0.06);
+  --glass-press: rgb(18 32 46 / 0.06);
+
+  /* Ambiance par défaut (ton « none ») : camaïeu de gris bleuté. */
+  --amb-1: #E7ECF0;
+  --amb-2: #D6DEE6;
+  --amb-3: #F1F4F7;
+  --amb-4: #C9D3DD;
 
   --radius-panel: 18px;
   --radius-control: 12px;
@@ -44,6 +132,7 @@
     --soon: #FF9A3D;
     --urgent: #FF7B6E;
     --live: #6FD597;
+    --live-dot: #FF4D52;
 
     --tone-ok: #6FD597;
     --tone-soon: #FF9A3D;
@@ -52,7 +141,86 @@
     --late-bg: #000000;
     --late-ink: #EEF2F5;
     --late-muted: #A5B4C2;
+
+    --glass-bg: rgb(255 255 255 / 0.07);
+    --glass-edge: rgb(255 255 255 / 0.16);
+    --glass-sheen: rgb(255 255 255 / 0.14);
+    --glass-shadow: 0 14px 36px rgb(0 0 0 / 0.38), 0 2px 6px rgb(0 0 0 / 0.2);
+    --glass-press: rgb(255 255 255 / 0.08);
+
+    --amb-1: #12202E;
+    --amb-2: #1A2C3E;
+    --amb-3: #0E1925;
+    --amb-4: #22384D;
   }
+}
+
+/* Camaïeux d'ambiance, un par ton : fond, deux nuances autour, une plus soutenue.
+   Suivre THEME dans js/core/ambient.js (barre du navigateur) si --amb-1 change. */
+:root[data-tone="ok"] {
+  --amb-1: #D3EEDC;
+  --amb-2: #B2E2C1;
+  --amb-3: #E6F6EB;
+  --amb-4: #93D4A8;
+}
+
+:root[data-tone="soon"] {
+  --amb-1: #FADDC0;
+  --amb-2: #F5C28F;
+  --amb-3: #FCEBDA;
+  --amb-4: #EFAA66;
+}
+
+:root[data-tone="urgent"] {
+  --amb-1: #F7D2CE;
+  --amb-2: #EFA9A1;
+  --amb-3: #FBE3E0;
+  --amb-4: #E6887F;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"])[data-tone="ok"] {
+    --amb-1: #0E2A1D;
+    --amb-2: #14432C;
+    --amb-3: #0A1F16;
+    --amb-4: #1D5C3C;
+  }
+
+  :root:not([data-theme="light"])[data-tone="soon"] {
+    --amb-1: #33200D;
+    --amb-2: #53330F;
+    --amb-3: #261709;
+    --amb-4: #6E4414;
+  }
+
+  :root:not([data-theme="light"])[data-tone="urgent"] {
+    --amb-1: #361514;
+    --amb-2: #5A1F1C;
+    --amb-3: #280F0E;
+    --amb-4: #76292A;
+  }
+}
+
+/* Trop tard : toute la fenêtre passe au noir, en clair comme en sombre, texte clair. */
+:root[data-tone="late"] {
+  color-scheme: dark;
+  --amb-1: #05070A;
+  --amb-2: #12171E;
+  --amb-3: #000000;
+  --amb-4: #1E242C;
+  --bg: #0B0F14;
+  --surface: #151A21;
+  --ink: #F2F5F8;
+  --muted: #B8C2CC;
+  --rule: rgb(255 255 255 / 0.18);
+  --accent: #FFB547;
+  --accent-ink: #12202E;
+  --live: #6FD597;
+  --glass-bg: rgb(255 255 255 / 0.06);
+  --glass-edge: rgb(255 255 255 / 0.14);
+  --glass-sheen: rgb(255 255 255 / 0.12);
+  --glass-shadow: 0 14px 36px rgb(0 0 0 / 0.5);
+  --glass-press: rgb(255 255 255 / 0.08);
 }
 
 *,
@@ -63,6 +231,118 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--amb-1);
+  transition-property: --amb-1, --amb-2, --amb-3, --amb-4, --ink, --muted;
+  transition-duration: 1.2s;
+  transition-timing-function: ease;
+}
+
+/* Fond d'ambiance : trois grandes taches floues du même ton qui dérivent lentement. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% -10%, var(--amb-3), transparent 60%),
+    var(--amb-1);
+  pointer-events: none;
+}
+
+.ambient span {
+  position: absolute;
+  width: 75vmax;
+  height: 75vmax;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.85;
+  will-change: transform;
+}
+
+.ambient span:nth-child(1) {
+  top: -30vmax;
+  left: -25vmax;
+  background: radial-gradient(circle, var(--amb-2), transparent 68%);
+}
+
+.ambient span:nth-child(2) {
+  bottom: -35vmax;
+  right: -30vmax;
+  background: radial-gradient(circle, var(--amb-4), transparent 66%);
+}
+
+.ambient span:nth-child(3) {
+  top: 30%;
+  left: 20%;
+  width: 55vmax;
+  height: 55vmax;
+  background: radial-gradient(circle, var(--amb-3), transparent 70%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ambient span:nth-child(1) {
+    animation: drift-a 32s ease-in-out infinite alternate;
+  }
+
+  .ambient span:nth-child(2) {
+    animation: drift-b 41s ease-in-out infinite alternate;
+  }
+
+  .ambient span:nth-child(3) {
+    animation: drift-c 53s ease-in-out infinite alternate;
+  }
+
+  /* Moins de 5 minutes : le fond respire au rythme du compteur. */
+  .is-pulsing-ambient .ambient {
+    animation: breathe 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes drift-a {
+  to {
+    transform: translate(18vmax, 14vmax) scale(1.12);
+  }
+}
+
+@keyframes drift-b {
+  to {
+    transform: translate(-16vmax, -12vmax) scale(0.92);
+  }
+}
+
+@keyframes drift-c {
+  to {
+    transform: translate(-12vmax, 10vmax) scale(1.18);
+  }
+}
+
+@keyframes breathe {
+  50% {
+    filter: saturate(1.35) brightness(0.97);
+  }
+}
+
+/* Panneau de verre : ce qui passe dessous (l'ambiance) reste perceptible, flouté. */
+.glass {
+  position: relative;
+  background:
+    linear-gradient(165deg, var(--glass-sheen), transparent 42%),
+    var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-sheen);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+}
+
+/* Sans flou d'arrière-plan, un verre plus opaque garde le texte lisible. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+  }
+
+  :root[data-tone="late"] .glass {
+    background: rgb(20 24 30 / 0.92);
+  }
 }
 
 body {
@@ -71,7 +351,7 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: transparent;
   color: var(--ink);
   font-family: var(--font-body);
   font-size: 1.0625rem;
@@ -157,10 +437,18 @@ main,
   white-space: nowrap;
   font-weight: 700;
   color: var(--ink);
-  background: transparent;
-  border: 1px solid var(--rule);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
   border-radius: 999px;
   cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.picker:active {
+  transform: scale(0.97);
 }
 
 .picker > span:last-child {
@@ -177,21 +465,39 @@ main,
   .picker {
     padding-inline: 0.5rem;
   }
+}
 
-  .picker-icon {
-    display: none;
-  }
+/* Bouton à pictogramme seul (choix de l'information) : un rond de 44 px. */
+.picker-square {
+  justify-content: center;
+  width: 2.75rem;
+  padding: 0;
+}
+
+/* Mode automatique : l'éclair, plein, à côté du repère. */
+.picker-bolt {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-left: -0.125rem;
+  fill: var(--accent);
+  stroke: none;
+}
+
+#picker-city {
+  display: inline-flex;
+  align-items: center;
 }
 
 .picker:hover {
-  border-color: var(--muted);
+  background: color-mix(in srgb, var(--glass-bg) 70%, var(--glass-sheen));
 }
 
 .picker-icon {
-  width: 1rem;
-  height: 1rem;
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
   fill: none;
-  stroke: var(--muted);
+  stroke: var(--ink);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -208,11 +514,27 @@ main {
 .site-footer {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding-block: 1.25rem 1.75rem;
-  border-top: 1px solid var(--rule);
+  gap: 0.5rem;
+  padding-block: 0.5rem 1.75rem;
   color: var(--muted);
   font-size: 0.875rem;
+  align-items: center;
+  text-align: center;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 1.5rem;
+}
+
+/* Liens du pied de page : 44 px de haut pour le pouce, sans grossir le texte. */
+.footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--ink);
 }
 
 /* ---------- Écran principal : le compte à rebours, puis l'arrêt et le domicile ---------- */
@@ -227,40 +549,97 @@ main {
   gap: 0.75rem;
 }
 
-/* Le ton colore les chiffres et teinte légèrement le fond du bloc.
+/* Le ton colore les chiffres ; toute la fenêtre porte la couleur de la situation (.ambient).
    Gris quand une information manque, noir quand c'est trop tard. */
 .hero {
   --tone: var(--tone-none);
   flex: 1;
   border-radius: 28px;
   padding-inline: 1rem;
-  background: color-mix(in srgb, var(--tone) 12%, transparent);
-  transition: background-color 0.4s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.375rem;
-  padding-block: clamp(0.75rem, 3dvh, 1.5rem);
+  padding-block: clamp(0.75rem, 2.5dvh, 1.25rem);
   text-align: center;
 }
 
+/* Le verre du compteur garde une lueur du ton en haut, comme une lumière derrière la vitre. */
+.hero.glass {
+  background:
+    radial-gradient(90% 55% at 50% 0%, color-mix(in srgb, var(--tone) 16%, transparent), transparent 72%),
+    linear-gradient(165deg, var(--glass-sheen), transparent 42%),
+    var(--glass-bg);
+}
+
+.hero-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* L'itinéraire, séparé de la tête par l'espace seul. */
+.hero-route {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  margin-top: 1.25rem;
+}
+
 .hero-label {
+  color: var(--muted);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
 }
 
 .countdown {
   font-family: var(--font-display);
   font-weight: 700;
   /* Suit la largeur, mais aussi la hauteur : tout doit tenir sur un petit écran. */
-  font-size: clamp(4.5rem, min(44vw, 21dvh), 12rem);
+  font-size: clamp(4rem, min(40vw, 16dvh), 11rem);
   line-height: 0.85;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--tone);
   white-space: nowrap;
   transition: color 0.4s ease, opacity 0.3s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .countdown.is-ticking {
+    animation: tick 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  /* Premier affichage : l'écran monte doucement en place. */
+  .screen.is-entering > * {
+    animation: enter 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .screen.is-entering > :nth-child(2) {
+    animation-delay: 0.08s;
+  }
+
+  .screen.is-entering > :nth-child(n + 3) {
+    animation-delay: 0.16s;
+  }
+}
+
+@keyframes tick {
+  from {
+    opacity: 0.25;
+    transform: translateY(0.08em);
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
 }
 
 .countdown-unit {
@@ -292,19 +671,11 @@ main {
 
 .tone-none {
   --tone: var(--tone-none);
-  background: color-mix(in srgb, var(--tone) 7%, transparent);
 }
 
+/* Trop tard : la fenêtre est noire (.ambient), le texte passe au clair via --ink. */
 .tone-late {
-  --tone: var(--late-ink);
-  background: var(--late-bg);
-  color: var(--late-ink);
-}
-
-.tone-late .hero-label,
-.tone-late .hero-note,
-.tone-late .hero-source {
-  color: var(--late-muted);
+  --tone: var(--ink);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -334,15 +705,6 @@ main {
   vertical-align: -0.05em;
 }
 
-.hero-line {
-  color: var(--muted);
-  font-size: 1rem;
-}
-
-.tone-late .hero-line {
-  color: var(--late-muted);
-}
-
 /* Estimé ou temps réel : un point devant, vert quand le tram est suivi en direct. */
 .hero-source {
   display: inline-flex;
@@ -360,13 +722,30 @@ main {
   border: 2px solid currentColor;
 }
 
+/* Données en direct : un point rouge plein qui clignote lentement, comme un voyant « live ». */
 .hero-source.is-live {
-  color: var(--live);
+  color: var(--ink);
   font-weight: 700;
 }
 
 .hero-source.is-live::before {
-  background: currentColor;
+  border: 0;
+  width: 0.625em;
+  height: 0.625em;
+  background: var(--live-dot);
+  box-shadow: 0 0 0 0.2em color-mix(in srgb, var(--live-dot) 25%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-source.is-live::before {
+    animation: live 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes live {
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .hero-note {
@@ -374,6 +753,25 @@ main {
   font-size: 0.9375rem;
   max-width: 26em;
   text-wrap: balance;
+}
+
+/* Depuis le même arrêt, une option laisse partir plus tard : une pastille touchable. */
+.hero-later {
+  min-height: 2.75rem;
+  padding: 0.375rem 1rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--tone) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+
+.hero-later:active {
+  transform: scale(0.97);
 }
 
 /* Calcul en cours : les chiffres s'estompent à peine et un segment glisse sur une ligne,
@@ -444,62 +842,240 @@ main {
   margin-top: 0.5rem;
 }
 
-/* Le trajet sous le compteur : votre position → arrêt proche → domicile.
-   Une ligne pleine largeur par étape, sans cadre ni fond : seul l'espace les sépare.
-   Un trait discret relie les pictogrammes, comme sur un plan de ligne :
-   pointillé pour la marche jusqu'à l'arrêt, plein pour le tram jusqu'au domicile. */
+/* Itinéraire du dernier trajet, dans le compteur, comme un calculateur d'itinéraire :
+   heures à gauche, tracé au centre (pointillé à pied, plein à la couleur de la ligne), étapes
+   à droite. */
+/* Le bloc prend la largeur de son contenu et se centre dans la tuile. */
+.route {
+  list-style: none;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  text-align: left;
+}
+
+.route-step {
+  display: grid;
+  grid-template-columns: 2.9rem 1.25rem minmax(0, 1fr) auto;
+  column-gap: 0.5rem;
+  align-items: center;
+  min-height: 1.75rem;
+}
+
+.route-step.is-ride {
+  min-height: 1.625rem;
+}
+
+.route-time {
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  line-height: 1;
+}
+
+/* Tracé : deux demi-segments (au-dessus et au-dessous du point) qui s'emboîtent d'une étape à
+   l'autre pour dessiner une ligne continue. */
+.route-rail {
+  position: relative;
+  align-self: stretch;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  justify-items: center;
+}
+
+.rail-seg {
+  width: 4px;
+  border-radius: 2px;
+  background: var(--seg, transparent);
+}
+
+.rail-seg.is-walk {
+  width: 3px;
+  background: radial-gradient(circle, var(--muted) 1.3px, transparent 1.6px) center top / 3px 6px repeat-y;
+}
+
+.rail-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--amb-3);
+  border: 3px solid var(--dot, var(--ink));
+}
+
+/* L'heure à retenir, celle du départ à pied, reprend le ton du compteur. */
+.route-step:first-child .route-time {
+  color: var(--tone);
+}
+
+.is-stop .route-time {
+  color: var(--ink);
+}
+
+.rail-dot.is-start {
+  border-color: var(--muted);
+}
+
+.rail-dot.is-end {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.route-body {
+  min-width: 0;
+  font-size: 0.9375rem;
+  line-height: 1.25;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.route-stop {
+  font-weight: 700;
+}
+
+.is-ride .route-body {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.is-ride .line-badge {
+  font-size: 0.8125rem;
+  vertical-align: 0.05em;
+}
+
+.route-tag {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tone) 18%, transparent);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: 0.1em;
+}
+
+.route-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.route-link {
+  color: var(--ink);
+}
+
+/* À côté de l'arrêt de départ : l'itinéraire à pied dans Google Maps, depuis votre position. */
+.route-go {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-block: -0.25rem;
+  border-radius: 50%;
+  color: var(--ink);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), 0 3px 10px rgb(0 0 0 / 0.08);
+  transition: transform 0.15s ease;
+}
+
+.route-go:active {
+  transform: scale(0.94);
+}
+
+/* Zone tactile de 44 px autour du rond de 36 px. */
+.route-go::after {
+  content: "";
+  position: absolute;
+  inset: -0.25rem;
+}
+
+.route-go-glyph {
+  width: 1.0625rem;
+  height: 1.0625rem;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+/* Le trajet sous le compteur : position → arrêt proche → domicile, côte à côte, posés sur le
+   fond. Deux lignes par colonne (intitulé, valeur) ; chaque colonne ouvre sa feuille. */
+/* De l'air entre la tuile du temps et la bande (ou l'annotation qui la précède). */
+.hero + .trip,
+.hero + .trip-callout {
+  margin-top: 0.75rem;
+}
+
 .trip {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.trip-row {
+.trip-col {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   min-width: 0;
 }
+
 
 .trip-button {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  column-gap: 0.625rem;
-  min-height: 3.5rem;
-  padding: 0.375rem 0.25rem;
+  gap: 0.0625rem;
+  min-height: 2.75rem;
+  padding: 0.375rem 0.25rem 0.5rem;
   font: inherit;
-  text-align: left;
+  text-align: center;
   color: var(--ink);
   background: none;
   border: 0;
-  border-radius: var(--radius-control);
+  border-radius: 18px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.2s ease, transform 0.15s ease;
 }
 
 .trip-button:active {
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  background: var(--glass-press);
+  transform: scale(0.97);
 }
 
 @media (hover: hover) {
-  .trip-button:hover .trip-value {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
+  .trip-button:hover {
+    background: var(--glass-press);
   }
 }
 
 .trip-icon {
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: 0.25rem;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), 0 4px 12px rgb(0 0 0 / 0.06);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+}
+
+.is-missing .trip-icon {
+  border-color: var(--accent);
 }
 
 .trip-glyph {
@@ -512,56 +1088,31 @@ main {
   stroke-linejoin: round;
 }
 
-/* Trait entre deux pictogrammes, du bas d'une étape au haut de la suivante. */
-.trip-row:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  left: calc(0.25rem + 1.125rem - 1px);
-  top: calc(50% + 1.125rem);
-  height: calc(100% - 2.25rem + 0.25rem);
-  border-left: 2px dotted color-mix(in srgb, var(--muted) 60%, transparent);
-}
-
-.trip-station::after {
-  border-left-style: solid !important;
-}
-
-.trip-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
 .trip-label {
   color: var(--muted);
-  font-size: 0.8125rem;
-  line-height: 1.25;
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
-.trip-value,
-.trip-detail {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
+/* Valeur sur deux lignes au plus : une adresse ou un nom de station tient en entier. */
 .trip-value {
+  max-width: 100%;
   font-weight: 700;
-  font-size: 1.0625rem;
-  line-height: 1.3;
+  font-size: 0.9375rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .trip-value .line-badge {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   vertical-align: 0.1em;
-  margin-right: 0.15em;
 }
 
-.trip-detail {
-  color: var(--muted);
-  font-size: 0.875rem;
-  line-height: 1.3;
-}
 
 /* Écrans courts (iPhone SE, petits Android) : tout tient sans défiler. */
 @media (max-height: 700px) {
@@ -581,34 +1132,33 @@ main {
     font-size: 1.125rem;
   }
 
-  .trip-button {
-    min-height: 3rem;
-    padding-block: 0.1875rem;
+  .countdown {
+    font-size: clamp(3.5rem, min(38vw, 13dvh), 11rem);
   }
 
-  .trip-value {
-    font-size: 1rem;
+  .hero-route {
+    margin-top: 0.875rem;
+    gap: 0.375rem;
   }
+
+  .route-step {
+    min-height: 1.5rem;
+  }
+
+  .route-step.is-ride {
+    min-height: 1.3125rem;
+  }
+
+  .trip-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-bottom: 0.125rem;
+  }
+
 }
 
-/* Action secondaire à droite de la ligne (itinéraire), zone tactile de 44 px. */
-.trip-link {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.75rem;
-  padding-inline: 0.75rem;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--ink);
-  font-size: 0.875rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-/* Information manquante : la ligne passe à la couleur d'accent. */
+/* Information manquante : la colonne passe à la couleur d'accent. */
 .is-missing .trip-value,
-.is-missing .trip-detail,
 .is-missing .trip-label {
   color: var(--accent);
 }
@@ -617,10 +1167,11 @@ main {
   stroke: var(--accent);
 }
 
-/* Annotation juste au-dessus de la ligne qui manque, pointe vers son pictogramme. */
+/* Annotation juste au-dessus de la bande, pointe vers la colonne qui manque (--col). */
 .trip-callout {
+  --col: 0;
   position: relative;
-  margin: 0.25rem 0 0.375rem;
+  margin: 0.25rem 0 0.125rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-control);
   background: var(--accent);
@@ -634,7 +1185,7 @@ main {
   content: "";
   position: absolute;
   bottom: -0.5rem;
-  left: calc(0.25rem + 1.125rem - 0.5rem);
+  left: calc((100% / 3) * (var(--col) + 0.5) - 0.5rem);
   border: 0.5rem solid transparent;
   border-bottom: 0;
   border-top-color: var(--accent);
@@ -674,9 +1225,60 @@ main {
 /* ---------- Méta et messages ---------- */
 
 .meta {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
   color: var(--muted);
   font-size: 0.875rem;
-  text-align: center;
+}
+
+.meta-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.875rem;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.meta-refresh:active {
+  transform: scale(0.97);
+}
+
+.meta-glyph {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Pendant un calcul, la flèche d'actualisation tourne. */
+@media (prefers-reduced-motion: no-preference) {
+  .is-computing .meta-glyph {
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .warning {
@@ -727,14 +1329,16 @@ main {
   font-size: 1.125rem;
   color: var(--ink);
   background: var(--surface);
-  border: 2px solid var(--rule);
-  border-radius: var(--radius-control);
-  padding: 0.8rem 0.9rem;
+  border: 2px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 16px;
+  padding: 0.8rem 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .field-input:focus-visible {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .field-input::placeholder {
@@ -805,137 +1409,303 @@ main {
   cursor: pointer;
 }
 
-/* ---------- Feuille de réglage ---------- */
+/* ---------- Feuilles de réglage ---------- */
 
+/* Toutes les feuilles ont la même anatomie (js/core/sheet.js) : tête (poignée, titre, bouton
+   de fermeture), puis dans cet ordre le champ, les choix en cartes, la valeur actuelle, les
+   actions en lignes, une note. Même verre, mêmes rayons, mêmes espacements partout. */
+
+/* Toujours en bas de l'écran, au-dessus du clavier virtuel s'il est ouvert (--keyboard). */
 .sheet {
+  --keyboard: 0px;
   width: 100%;
   max-width: var(--measure);
-  max-height: 88vh;
-  max-height: 88dvh;
-  margin: auto auto 0;
+  max-height: calc(88vh - var(--keyboard));
+  max-height: calc(88dvh - var(--keyboard));
+  margin: auto auto var(--keyboard);
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--ink);
+  overflow: visible;
 }
 
 .sheet::backdrop {
-  background: rgb(0 0 0 / 0.55);
+  background: rgb(0 0 0 / 0.35);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
+/* Verre dépoli, plus opaque que les panneaux : on y lit et on y tape. */
 .sheet-panel {
   display: flex;
   flex-direction: column;
   max-height: inherit;
-  background: var(--surface);
-  border-radius: 22px 22px 0 0;
-  padding: 1rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  background:
+    linear-gradient(165deg, var(--glass-sheen), transparent 40%),
+    color-mix(in srgb, var(--surface) 84%, transparent);
+  border: 1px solid var(--glass-edge);
+  border-bottom: 0;
+  box-shadow: 0 -8px 40px rgb(0 0 0 / 0.18), inset 0 1px 0 var(--glass-sheen);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  border-radius: 28px 28px 0 0;
+  padding: 0.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Entrée et sortie : la feuille glisse depuis son bord, le voile se fond. */
 @media (prefers-reduced-motion: no-preference) {
   .sheet[open] .sheet-panel {
-    animation: sheet-in 0.22s ease-out;
+    animation: sheet-up 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .sheet[open]::backdrop {
+    animation: veil-in 0.25s ease-out;
+  }
+
+  .sheet.is-closing .sheet-panel {
+    animation: sheet-up 0.18s ease-in reverse forwards;
+  }
+
+  .sheet.is-closing::backdrop {
+    animation: veil-in 0.18s ease-in reverse forwards;
   }
 }
 
-@keyframes sheet-in {
+@keyframes sheet-up {
   from {
-    transform: translateY(40%);
+    transform: translateY(100%);
+  }
+}
+
+@keyframes veil-in {
+  from {
     opacity: 0;
   }
 }
 
-/* Feuille de formulaire : ancrée en haut, pour que le clavier (qui monte par le bas)
-   ne cache ni le champ ni ses suggestions. */
-.sheet.sheet-tall {
-  margin: 0 auto auto;
-  max-height: 100vh;
-  max-height: 100dvh;
+/* Tête : poignée au centre, titre à gauche, fermer à droite. On tire la tête vers le bas pour
+   fermer. */
+.sheet-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.75rem;
+  padding-bottom: 1rem;
+  touch-action: none;
 }
 
-.sheet-tall .sheet-panel {
-  border-radius: 0 0 22px 22px;
-  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
-  padding-bottom: 1.5rem;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .sheet-tall[open] .sheet-panel {
-    animation: sheet-down 0.22s ease-out;
-  }
-}
-
-@keyframes sheet-down {
-  from {
-    transform: translateY(-30%);
-    opacity: 0;
-  }
+.sheet-grabber {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: 2.5rem;
+  height: 5px;
+  margin-bottom: 0.625rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
 }
 
 .sheet-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding-bottom: 0.75rem;
+  cursor: grab;
 }
 
 .sheet-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.75rem;
+  font-size: 1.625rem;
   line-height: 1.1;
+}
+
+.sheet-close {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+
+.sheet-close:active {
+  transform: scale(0.94);
+}
+
+.sheet-close svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
 }
 
 .sheet-body {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.sheet-text {
-  color: var(--muted);
+/* Carte : le fond commun des choix, de la valeur actuelle, des actions et des suggestions. */
+.sheet-option,
+.sheet-actions,
+.sheet .suggestions {
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  border-radius: 16px;
 }
 
 .sheet-options {
   list-style: none;
   padding: 0;
-  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
 .sheet-option {
+  position: relative;
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
-  padding: 0.75rem 0.9rem;
+  min-height: 3.5rem;
+  justify-content: center;
+  padding: 0.75rem 3rem 0.75rem 1rem;
   font: inherit;
   text-align: left;
   color: var(--ink);
-  background: transparent;
-  border: 2px solid var(--rule);
-  border-radius: var(--radius-control);
   cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 
+.sheet-option:active {
+  transform: scale(0.985);
+}
+
+/* Choix en cours : liseré d'accent et coche à droite. */
 .sheet-option[aria-pressed="true"] {
   border-color: var(--accent);
-  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, color-mix(in srgb, var(--surface) 70%, transparent));
+}
+
+.sheet-option[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 1.25rem;
+  width: 0.4rem;
+  height: 0.8rem;
+  border: solid var(--accent);
+  border-width: 0 2.5px 2.5px 0;
+  transform: translateY(-60%) rotate(45deg);
+}
+
+/* Focus au clavier dans les feuilles : un anneau fin, qui ne double pas le liseré du choix. */
+.sheet :focus-visible {
+  outline-width: 2px;
+  outline-offset: 2px;
 }
 
 .sheet-option-main {
   font-weight: 700;
 }
 
+/* Éclair devant « Automatique », comme dans l'en-tête. */
+.sheet-bolt {
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.3em;
+  vertical-align: -0.1em;
+  fill: var(--accent);
+}
+
+.sheet-option-main .line-badge {
+  font-size: 0.875rem;
+  vertical-align: 0.1em;
+}
+
 .sheet-option-detail {
   color: var(--muted);
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+/* Valeur actuelle (adresse enregistrée, position connue). */
+.sheet-current {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+
+.sheet-current-label {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.sheet-current-value {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+/* Actions secondaires : une liste de lignes dans une carte, séparées par un filet. */
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sheet-action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.25rem;
+  padding: 0.625rem 1rem;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.sheet-action + .sheet-action {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.sheet-action:active {
+  background: var(--glass-press);
+}
+
+.sheet-glyph {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sheet-note {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
 }
 
 .sheet-field {
@@ -945,7 +1715,57 @@ main {
 /* Dans la feuille, les suggestions poussent le contenu au lieu de flotter. */
 .sheet .suggestions {
   position: static;
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
   max-height: none;
   box-shadow: none;
+}
+
+/* ---------- Pages légales ---------- */
+
+.legal {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem 1.25rem 2rem;
+  border-radius: 28px;
+  margin-block: 0.5rem 1.5rem;
+}
+
+.legal h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.25rem;
+  line-height: 1.05;
+}
+
+.legal h2 {
+  margin-top: 0.75rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+
+.legal p,
+.legal li {
+  max-width: 38em;
+}
+
+.legal ul {
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.legal-updated {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  font-weight: 700;
 }

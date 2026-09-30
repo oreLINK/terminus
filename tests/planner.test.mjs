@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseJourneys } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, nearestStations, sharedLines, plan } from "../js/features/last-ride/planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
 
 // Ligne A fictive d'ouest en est : Ouest -> Centre -> Pont -> Est, un quai par sens.
 const A = "bordeaux:Line:59:LOC";
@@ -39,12 +39,28 @@ const westbound = (id, start) => ({
   calls: [call("E0", "Est", start), call("P0", "Pont", start + 3 * 60000), call("C1", "Centre", start + 6 * 60000), call("O1", "Ouest", start + 10 * 60000)],
 });
 
+// Ligne B fictive, du nord vers Centre, où elle croise la ligne A.
+const southbound = (id, start) => ({
+  id,
+  line: B,
+  headsign: "Centre",
+  calls: [call("N0", "Nord", start), call("C0", "Centre", start + 8 * 60000)],
+});
+// Course de la ligne A qui ne part que de Pont (renfort de fin de soirée).
+const fromPont = (id, start) => ({
+  id,
+  line: A,
+  headsign: "Est",
+  calls: [call("P0", "Pont", start), call("E0", "Est", start + 3 * 60000)],
+});
+
 const index = buildIndex(STOPS);
 const here = { lat: 44.8402, lon: -0.5803 }; // devant Centre
+const nord = { lat: 44.8702, lon: -0.5803 }; // devant Nord, sur la ligne B seulement
 const home = { lat: 44.8405, lon: -0.5405 }; // à côté d'Est
 
-function run(journeys, now = NOW) {
-  const origins = nearestStations(index.stations, here, { radius: 2000, min: 2, max: 8 });
+function run(journeys, now = NOW, from = here) {
+  const origins = nearestStations(index.stations, from, { radius: 2000, min: 2, max: 8 });
   const dests = nearestStations(index.stations, home, { radius: 1500, min: 1, max: 5 });
   return plan({ origins, dests, journeys, index, lineCodes: CODES, now });
 }
@@ -54,10 +70,10 @@ test("les quais homonymes forment une seule station", () => {
   assert.deepEqual(index.stations.find((s) => s.name === "Centre").refs.sort(), ["C0", "C1"]);
 });
 
-test("seules les lignes communes aux deux côtés sont interrogées", () => {
-  const origins = nearestStations(index.stations, here, { radius: 1000, min: 1, max: 8 });
+test("les lignes des deux côtés sont interrogées, pour trouver les correspondances", () => {
+  const origins = nearestStations(index.stations, nord, { radius: 1000, min: 1, max: 8 });
   const dests = nearestStations(index.stations, home, { radius: 500, min: 1, max: 5 });
-  assert.deepEqual(sharedLines(origins, dests), [A]);
+  assert.deepEqual(candidateLines(origins, dests).sort(), [A, B].sort());
 });
 
 test("dernier tram : le plus tardif dans le bon sens, pas le dernier de la liste", () => {
@@ -68,13 +84,14 @@ test("dernier tram : le plus tardif dans le bon sens, pas le dernier de la liste
   assert.equal(r.primary.dest.station.name, "Est");
   assert.equal(r.primary.last.journeyId, "j3");
   assert.equal(r.primary.next.journeyId, "j1");
-  assert.equal(r.primary.leaveBy, r.primary.last.dep - r.primary.origin.walk.minutes * 60000);
+  // Marche jusqu'à l'arrêt, plus la marge.
+  assert.equal(r.primary.leaveBy, r.primary.last.dep - r.primary.origin.walk.minutes * 60000 - WALK_MARGIN_MS);
 });
 
 test("une course partielle qui s'arrête avant l'arrivée n'est pas le dernier tram vers Est", () => {
   const journeys = [eastbound("full", min(20)), eastbound("partial", min(50), { toEnd: false })];
   const r = run(journeys);
-  const toEst = r.options.find((o) => o.dest.station.name === "Est");
+  const toEst = r.options.find((o) => o.dest.station.name === "Est" && o.transfers === 0);
   assert.equal(toEst.last.journeyId, "full");
 });
 
@@ -105,6 +122,98 @@ test("aucun tram ne relie les deux côtés de la journée : statut none", () => 
 test("service terminé : le prochain départ est demain matin", () => {
   const r = run([eastbound("morning", min(4 * 60))]);
   assert.equal(r.status, "ended");
+});
+
+test("correspondance : le dernier B qui attrape encore le dernier A", () => {
+  // B arrive à Centre 8 min après Nord ; A passe à Centre 4 min après Ouest.
+  const journeys = [
+    southbound("b1", min(10)), // Centre à +18 → A de +24
+    southbound("b2", min(30)), // Centre à +38 → A de +44
+    southbound("b3", min(50)), // Centre à +58 → plus de A
+    eastbound("a1", min(20)),
+    eastbound("a2", min(40)),
+  ];
+  const r = run(journeys, NOW, nord);
+  assert.equal(r.status, "ok");
+  assert.equal(r.primary.origin.station.name, "Nord");
+  assert.equal(r.primary.transfers, 1);
+  assert.equal(r.primary.last.journeyId, "b2");
+  assert.deepEqual(r.primary.last.legs.map((l) => l.journeyId), ["b2", "a2"]);
+  assert.equal(r.primary.last.legs[1].from.name, "Centre");
+  assert.equal(r.primary.next.legs[1].journeyId, "a1");
+  assert.equal(r.primary.dest.station.name, "Est");
+  assert.equal(r.primary.leaveBy, min(30) - r.primary.origin.walk.minutes * 60000 - WALK_MARGIN_MS);
+});
+
+test("correspondance : il faut le temps de changer de quai", () => {
+  // B arrive à Centre à +38. A en repart à +39 : moins que la marge. À +40 : juste la marge.
+  assert.ok(60000 < TRANSFER_MS && TRANSFER_MS <= 2 * 60000);
+  assert.notEqual(run([southbound("b1", min(30)), eastbound("a1", min(35))], NOW, nord).status, "ok");
+  assert.equal(run([southbound("b1", min(30)), eastbound("a1", min(36))], NOW, nord).status, "ok");
+});
+
+test("le direct passe en premier, la correspondance qui part plus tard est signalée", () => {
+  // Direct : dernier A complet à +20. Plus tard : A partiel jusqu'à Pont, puis renfort Pont → Est.
+  const journeys = [eastbound("full", min(20)), eastbound("partial", min(50), { toEnd: false }), fromPont("p1", min(60))];
+  const r = run(journeys);
+  assert.equal(r.primary.transfers, 0);
+  assert.equal(r.primary.last.journeyId, "full");
+  assert.equal(r.later.transfers, 1);
+  assert.deepEqual(r.later.last.legs.map((l) => l.journeyId), ["partial", "p1"]);
+  assert.equal(r.later.last.legs[1].from.name, "Pont");
+});
+
+test("le dernier direct manqué, la correspondance prend le relais", () => {
+  const journeys = [eastbound("gone", min(-4)), eastbound("partial", min(50), { toEnd: false }), fromPont("p1", min(60))];
+  const r = run(journeys);
+  assert.equal(r.status, "ok");
+  // Depuis Centre, plus de direct : il reste le A partiel puis la correspondance à Pont.
+  const fromCentre = r.options.filter((o) => o.origin.station.name === "Centre");
+  assert.deepEqual(fromCentre.map((o) => o.transfers), [1]);
+  assert.equal(fromCentre[0].last.journeyId, "partial");
+  // Pont est aussi à portée de marche : y aller à pied pour le renfort direct compte moins qu'une correspondance.
+  assert.equal(r.primary.origin.station.name, "Pont");
+  assert.equal(r.primary.transfers, 0);
+});
+
+// Graphe fictif du même réseau : ordre des quais par ligne et par sens.
+const GRAPH = {
+  names: Object.fromEntries(STOPS.map((s) => [s.ref, s.name])),
+  patterns: [
+    { line: A, direction: "0", stops: ["O0", "C0", "P0", "E0"] },
+    { line: A, direction: "1", stops: ["E0", "P0", "C1", "O1"] },
+    { line: B, direction: "0", stops: ["N0", "C0"] },
+    { line: B, direction: "1", stops: ["C1", "N0"] },
+  ],
+};
+const requests = (from, opts = {}, graph = GRAPH) =>
+  routeRequests({
+    graph,
+    index,
+    origins: nearestStations(index.stations, from, { radius: 500, min: 1, max: 8 }),
+    dests: nearestStations(index.stations, home, { radius: 500, min: 1, max: 5 }),
+    ...opts,
+  })
+    .map((r) => `${CODES[r.line]}${r.direction}`)
+    .sort();
+
+test("graphe : un trajet direct ne charge qu'une ligne, dans un seul sens", () => {
+  assert.deepEqual(requests(here), ["A0"]);
+});
+
+test("graphe : une correspondance charge les deux lignes, dans le bon sens", () => {
+  assert.deepEqual(requests(nord), ["A0", "B0"]);
+});
+
+test("graphe : une correspondance de plus seulement si on la demande", () => {
+  // Centre → Ouest par A1, puis Ouest → Est par A0 : deux tronçons, un de plus que le direct.
+  assert.deepEqual(requests(here, { extraTransfers: 1 }), ["A0", "A1"]);
+});
+
+test("graphe : un arrêt inconnu est ignoré, et sans trajet la liste est vide", () => {
+  const onlyB = { names: GRAPH.names, patterns: [{ line: B, direction: "0", stops: ["N0", "ZZ", "C0"] }] };
+  assert.deepEqual(requests(here, {}, onlyB), []);
+  assert.deepEqual(requests(nord, { maxTransfers: 0 }), []);
 });
 
 test("parseJourneys lit le format Mecatran et privilégie le temps réel", () => {
