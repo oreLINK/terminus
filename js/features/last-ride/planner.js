@@ -240,6 +240,34 @@ function firstFrom(list, t, skipJourney) {
   return list[lo] ?? null;
 }
 
+// Fin du service en cours : la prochaine occurrence, après `now`, de l'heure `hour` dans le
+// fuseau du réseau (3 h du matin à Bordeaux). Le dernier tram est le dernier départ avant elle.
+// L'API renvoie environ les 12 heures à venir, nuit comprise : sans cette coupure, le « dernier
+// tram » du soir serait un tram du lendemain midi. La nuit d'un changement d'heure, la coupure
+// peut être décalée d'une heure.
+export function serviceEndAfter(now, { timeZone, hour }) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  // Heure locale lue comme si elle était UTC : l'écart avec `now` donne le décalage du fuseau.
+  const localAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const offset = localAsUtc - Math.floor(now / 1000) * 1000;
+  let end = Date.UTC(parts.year, parts.month - 1, parts.day, hour);
+  if (end <= localAsUtc) end += 24 * 3600 * 1000;
+  return end - offset;
+}
+
 // Trajet complet à partir d'un départ du profil. Les champs du premier tronçon restent à la
 // racine (dep, lineCode…) : c'est le tram à prendre depuis l'arrêt de départ.
 function itinerary(entry, lineCodes) {
@@ -266,7 +294,8 @@ function itinerary(entry, lineCodes) {
 // Une option par couple (station de départ, nombre de correspondances), toutes lignes confondues.
 // Les courses partielles (qui s'arrêtent avant la station d'arrivée) ne servent que si une
 // correspondance permet de finir le trajet.
-export function plan({ origins, dests, journeys, index, lineCodes, now, maxTransfers = MAX_TRANSFERS }) {
+// `serviceEnd` : fin du service en cours (serviceEndAfter) ; les départs après elle sont ignorés.
+export function plan({ origins, dests, journeys, index, lineCodes, now, serviceEnd = Infinity, maxTransfers = MAX_TRANSFERS }) {
   const destById = new Map(dests.map((d) => [d.station.id, d]));
   const profiles = buildProfiles({ journeys, index, destById, maxTransfers });
 
@@ -278,8 +307,8 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, maxTrans
     const walkToMs = origin.walk.minutes * MIN + WALK_MARGIN_MS;
     profiles.forEach((profile, transfers) => {
       const entries = profile.get(origin.station.id) ?? [];
-      const future = entries.filter((e) => e.dep >= now - MIN);
-      if (future.length < entries.length) servedEarlier = true;
+      const future = entries.filter((e) => e.dep >= now - MIN && e.dep < serviceEnd);
+      if (entries.some((e) => e.dep < now - MIN)) servedEarlier = true;
       if (future.length) upcoming = true;
       const catchable = future.filter((e) => e.dep >= now + walkToMs).map((e) => itinerary(e, lineCodes));
       if (!catchable.length) return;
