@@ -6,6 +6,7 @@ import { loadNetwork, loadTimetable, clearTimetableCache } from "./siri-lite.js"
 export default {
   id: "bordeaux-tbm",
   city: "Bordeaux",
+  timeZone: "Europe/Paris",
   name: "TBM, Bordeaux Métropole",
 
   // Zone desservie : sert au choix automatique de la ville d'après la position.
@@ -37,6 +38,8 @@ export default {
   features: {
     "last-ride": {
       vehicle: "tram",
+      // Le dernier tram est celui de la soirée : dernier départ avant 3 h du matin (heure locale).
+      serviceEndHour: 3,
       loadStops: loadNetwork, // → { lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }
       loadTimetable, // (lineRef, direction) → [{ id, line, headsign, calls: [...] }]
       // Ordre des arrêts par ligne et par sens, généré par tools/build-graph.mjs, chargé à la demande.

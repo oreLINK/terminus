@@ -45,6 +45,12 @@ test("l'adaptateur du dernier tram fournit les fonctions attendues", () => {
     assert.equal(typeof a.loadStops, "function", n.id);
     assert.equal(typeof a.loadTimetable, "function", n.id);
     assert.ok(a.vehicle, n.id);
+    // Heure de fin de service (dernier tram de la soirée) : il faut aussi le fuseau du réseau.
+    if (a.serviceEndHour != null) {
+      assert.ok(Number.isInteger(a.serviceEndHour) && a.serviceEndHour >= 0 && a.serviceEndHour < 24, n.id);
+      assert.doesNotThrow(() => new Intl.DateTimeFormat("fr-FR", { timeZone: n.timeZone }), n.id);
+      assert.ok(n.timeZone, `${n.id} : serviceEndHour sans timeZone`);
+    }
   }
 });
 

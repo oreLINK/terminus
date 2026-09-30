@@ -1,7 +1,7 @@
 // Type d'information « Le dernier tram pour rentrer » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc } from "../../core/util.js";
 import { openSheet, closeSheet, sheetOptions, sheetCurrent, sheetAction, sheetActions, sheetNote, AUTOMATIC } from "../../core/sheet.js";
@@ -247,7 +247,11 @@ function mount({ root, network, adapter }) {
         journeys = journeys.concat(got.journeys);
         failed += got.failed;
         now = Date.now();
-        result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now });
+        const serviceEnd =
+          adapter.serviceEndHour == null
+            ? Infinity
+            : serviceEndAfter(now, { timeZone: network.timeZone, hour: adapter.serviceEndHour });
+        result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd });
         if (result.options.length) break;
       }
 
