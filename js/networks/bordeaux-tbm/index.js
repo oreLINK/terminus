@@ -39,6 +39,8 @@ export default {
       vehicle: "tram",
       loadStops: loadNetwork, // → { lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }
       loadTimetable, // (lineRef, direction) → [{ id, line, headsign, calls: [...] }]
+      // Ordre des arrêts par ligne et par sens, généré par tools/build-graph.mjs, chargé à la demande.
+      loadGraph: () => import("./graph.js").then((m) => m.default), // → { names, patterns: [{ line, direction, stops }] }
       clearCache: clearTimetableCache,
     },
   },

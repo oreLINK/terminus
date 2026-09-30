@@ -10,24 +10,28 @@
   <meta name="theme-color" content="#F3F5F7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#12202E" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312202E'/%3E%3Crect x='5' y='14' width='17' height='4' fill='%23FFB547'/%3E%3Crect x='21' y='8' width='5' height='16' rx='1' fill='%23FFB547'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;700&display=swap">
+  <!-- Polices hébergées avec le site (fonts/) : rien n'est demandé à un service tiers au chargement. -->
+  <link rel="preload" href="fonts/barlow-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/atkinson-hyperlegible-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
+  <!-- Fond d'ambiance : le ton de la situation en camaïeu, sous tout le reste (js/core/ambient.js). -->
+  <div class="ambient" aria-hidden="true"><span></span><span></span><span></span></div>
+
   <header class="masthead">
     <p class="wordmark">Terminus</p>
     <nav class="pickers" aria-label="Réglages">
-      <button type="button" class="picker" data-action="open-city" aria-haspopup="dialog">
+      <!-- Ville : repère + éclair en mode automatique, repère + nom de la ville en mode manuel (js/app.js). -->
+      <button type="button" class="picker" id="picker-city-button" data-action="open-city" aria-haspopup="dialog">
         <svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>
-        <span class="visually-hidden">Ville :</span>
-        <span id="picker-city">Ville</span>
+        <span id="picker-city"><span class="visually-hidden">Ville</span></span>
       </button>
-      <button type="button" class="picker" data-action="open-feature" aria-haspopup="dialog">
-        <span class="visually-hidden">Information :</span>
-        <span id="picker-feature">Information</span>
+      <!-- Information : un pictogramme seul, le nom reste pour les lecteurs d'écran. -->
+      <button type="button" class="picker picker-square" data-action="open-feature" aria-haspopup="dialog">
+        <svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>
+        <span class="visually-hidden" id="picker-feature">Information</span>
       </button>
     </nav>
   </header>
@@ -45,18 +49,23 @@
 
   <dialog id="sheet" class="sheet" aria-labelledby="sheet-title">
     <div class="sheet-panel">
+      <!-- Tête : poignée (à tirer vers le bas pour fermer), titre, bouton de fermeture (js/core/sheet.js). -->
       <div class="sheet-head">
+        <span class="sheet-grabber" aria-hidden="true"></span>
         <h2 class="sheet-title" id="sheet-title"></h2>
-        <form method="dialog">
-          <button type="submit" class="link-button">Fermer</button>
-        </form>
+        <button type="button" class="sheet-close" aria-label="Fermer">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
       </div>
       <div class="sheet-body" id="sheet-body"></div>
     </div>
   </dialog>
 
   <footer class="site-footer">
-    <p class="footer-sources" id="footer-sources"></p>
+    <nav class="footer-links" aria-label="Informations légales">
+      <a href="mentions-legales.html">Mentions légales</a>
+      <a href="confidentialite.html">Confidentialité</a>
+    </nav>
   </footer>
 </body>
 </html>

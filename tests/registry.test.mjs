@@ -48,6 +48,27 @@ test("l'adaptateur du dernier tram fournit les fonctions attendues", () => {
   }
 });
 
+test("le graphe du réseau, s'il existe, décrit des lignes de tram connues dans les deux sens", async () => {
+  for (const n of NETWORKS) {
+    const a = n.features["last-ride"];
+    if (!a?.loadGraph) continue;
+    const graph = await a.loadGraph();
+    assert.ok(graph.patterns.length > 0, n.id);
+    const directions = new Set();
+    for (const p of graph.patterns) {
+      assert.ok(["0", "1"].includes(p.direction), `${n.id} ${p.line} sens ${p.direction}`);
+      assert.ok(p.stops.length >= 2, `${n.id} ${p.line} : motif trop court`);
+      for (const ref of p.stops) assert.ok(graph.names[ref], `${n.id} : arrêt sans nom ${ref}`);
+      directions.add(`${p.line}|${p.direction}`);
+    }
+    // Chaque ligne du graphe apparaît dans les deux sens.
+    for (const key of directions) {
+      const [line, dir] = key.split("|");
+      assert.ok(directions.has(`${line}|${dir === "0" ? "1" : "0"}`), `${n.id} ${line} : un seul sens`);
+    }
+  }
+});
+
 test("la ville est choisie d'après la position", () => {
   assert.equal(networkAt({ lat: 44.8378, lon: -0.5792 })?.id, "bordeaux-tbm"); // place de la Comédie
   assert.equal(networkAt({ lat: 48.8566, lon: 2.3522 }), null); // Paris : aucun réseau

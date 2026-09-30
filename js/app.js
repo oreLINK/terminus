@@ -4,16 +4,17 @@
 import { NETWORKS, getNetwork, networkAt } from "./networks/index.js";
 import { FEATURES, DEFAULT_FEATURE, featuresFor } from "./features/index.js";
 import { location } from "./core/location.js";
-import { openSheet, closeSheet } from "./core/sheet.js";
+import { openSheet, closeSheet, sheetOptions, sheetNote, boltSvg, AUTOMATIC } from "./core/sheet.js";
 import { readJSON, writeJSON } from "./core/storage.js";
 import { esc } from "./core/util.js";
 
 const PREFS_KEY = "dt.prefs.v1"; // { city: "auto" | id, feature: "auto" | id, lastNetwork: id }
 
 const root = document.getElementById("app");
+const cityButton = document.getElementById("picker-city-button");
 const cityLabel = document.getElementById("picker-city");
 const featureLabel = document.getElementById("picker-feature");
-const footerSources = document.getElementById("footer-sources");
+
 
 const prefs = { city: "auto", feature: "auto", lastNetwork: null, ...readJSON(PREFS_KEY) };
 const savePrefs = () => writeJSON(PREFS_KEY, prefs);
@@ -61,24 +62,19 @@ function mount() {
   paintChrome();
 }
 
+// En-tête compact : en mode automatique, la ville se devine (repère + éclair) ; son nom ne
+// s'affiche que si elle a été choisie à la main. Les sources sont sur la page Mentions légales.
 function paintChrome() {
   const { network, feature } = current;
-  cityLabel.textContent = network.city;
-  featureLabel.textContent = feature.short;
-  footerSources.textContent = `${network.attribution} Adresses : Géoplateforme de l'IGN.`;
+  const auto = prefs.city === "auto";
+  cityButton.classList.toggle("is-auto", auto);
+  cityLabel.innerHTML = auto
+    ? `${boltSvg("picker-icon picker-bolt")}<span class="visually-hidden">Ville automatique : ${esc(network.city)}</span>`
+    : `<span class="visually-hidden">Ville : </span>${esc(network.city)}`;
+  featureLabel.textContent = `Information : ${feature.short}`;
 }
 
 // ---------- Sélecteurs ----------
-
-function optionHtml(action, value, main, detail, pressed) {
-  return `
-    <li>
-      <button type="button" class="sheet-option" data-action="${action}" data-value="${esc(value)}" aria-pressed="${pressed}">
-        <span class="sheet-option-main">${esc(main)}</span>
-        <span class="sheet-option-detail">${esc(detail)}</span>
-      </button>
-    </li>`;
-}
 
 function openCitySheet() {
   const detected = networkAt(location.here);
@@ -89,12 +85,16 @@ function openCitySheet() {
       : "Selon votre position, dès qu'elle est connue";
   const body = openSheet(
     "Ville",
-    `
-    <ul class="sheet-options">
-      ${optionHtml("pick-city", "auto", "Automatique", autoDetail, prefs.city === "auto")}
-      ${NETWORKS.map((n) => optionHtml("pick-city", n.id, n.city, n.name, prefs.city === n.id)).join("")}
-    </ul>
-    <p class="sheet-text">D'autres villes arriveront.</p>`,
+    sheetOptions([
+      { action: "pick-city", value: "auto", main: AUTOMATIC, detail: esc(autoDetail), pressed: prefs.city === "auto" },
+      ...NETWORKS.map((n) => ({
+        action: "pick-city",
+        value: n.id,
+        main: esc(n.city),
+        detail: esc(n.name),
+        pressed: prefs.city === n.id,
+      })),
+    ]) + sheetNote("D'autres villes arriveront."),
   );
   body.querySelector('[aria-pressed="true"]')?.focus();
 }
@@ -104,12 +104,22 @@ function openFeatureSheet() {
   const byDefault = FEATURES.find((f) => f.id === DEFAULT_FEATURE);
   const body = openSheet(
     "Information",
-    `
-    <ul class="sheet-options">
-      ${optionHtml("pick-feature", "auto", "Automatique", byDefault.title, prefs.feature === "auto")}
-      ${available.map((f) => optionHtml("pick-feature", f.id, f.title, f.description, prefs.feature === f.id)).join("")}
-    </ul>
-    <p class="sheet-text">D'autres informations arriveront.</p>`,
+    sheetOptions([
+      {
+        action: "pick-feature",
+        value: "auto",
+        main: AUTOMATIC,
+        detail: esc(byDefault.title),
+        pressed: prefs.feature === "auto",
+      },
+      ...available.map((f) => ({
+        action: "pick-feature",
+        value: f.id,
+        main: esc(f.title),
+        detail: esc(f.description),
+        pressed: prefs.feature === f.id,
+      })),
+    ]) + sheetNote("D'autres informations arriveront."),
   );
   body.querySelector('[aria-pressed="true"]')?.focus();
 }
@@ -126,6 +136,8 @@ document.addEventListener("click", (e) => {
     savePrefs();
     closeSheet();
     mount();
+    // Passer d'« Automatique » à la même ville ne remonte rien, mais change l'en-tête.
+    paintChrome();
   }
 });
 
