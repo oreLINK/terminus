@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseJourneys } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
 
 // Ligne A fictive d'ouest en est : Ouest -> Centre -> Pont -> Est, un quai par sens.
 const A = "bordeaux:Line:59:LOC";
@@ -59,10 +59,13 @@ const here = { lat: 44.8402, lon: -0.5803 }; // devant Centre
 const nord = { lat: 44.8702, lon: -0.5803 }; // devant Nord, sur la ligne B seulement
 const home = { lat: 44.8405, lon: -0.5405 }; // à côté d'Est
 
+// Comme le réseau TBM : le service se termine à 3 h du matin, heure de Paris.
+const SERVICE = { timeZone: "Europe/Paris", hour: 3 };
+
 function run(journeys, now = NOW, from = here) {
   const origins = nearestStations(index.stations, from, { radius: 2000, min: 2, max: 8 });
   const dests = nearestStations(index.stations, home, { radius: 1500, min: 1, max: 5 });
-  return plan({ origins, dests, journeys, index, lineCodes: CODES, now });
+  return plan({ origins, dests, journeys, index, lineCodes: CODES, now, serviceEnd: serviceEndAfter(now, SERVICE) });
 }
 
 test("les quais homonymes forment une seule station", () => {
@@ -119,9 +122,37 @@ test("aucun tram ne relie les deux côtés de la journée : statut none", () => 
   assert.equal(r.status, "none");
 });
 
-test("service terminé : le prochain départ est demain matin", () => {
-  const r = run([eastbound("morning", min(4 * 60))]);
+test("fin du service : la prochaine fois qu'il est 3 h du matin à Paris", () => {
+  const paris = (iso) => Date.parse(iso); // heures d'été : Paris = UTC + 2
+  // L'après-midi : 3 h du lendemain.
+  assert.equal(serviceEndAfter(paris("2026-09-27T12:00:00Z"), SERVICE), paris("2026-09-28T01:00:00Z"));
+  // Après minuit : 3 h le jour même.
+  assert.equal(serviceEndAfter(paris("2026-09-27T22:30:00Z"), SERVICE), paris("2026-09-28T01:00:00Z"));
+  // 3 h pile ou après : 3 h du lendemain.
+  assert.equal(serviceEndAfter(paris("2026-09-28T01:00:00Z"), SERVICE), paris("2026-09-29T01:00:00Z"));
+  // En hiver, Paris = UTC + 1.
+  assert.equal(serviceEndAfter(paris("2026-12-01T12:00:00Z"), SERVICE), paris("2026-12-02T02:00:00Z"));
+});
+
+test("service terminé : il est plus de 3 h et le premier tram est dans plus de 2 h", () => {
+  // 3 h 05 à Paris : le service de la veille est fini, le premier tram part à 5 h 30.
+  const at = Date.parse("2026-09-28T01:05:00Z");
+  const r = run([eastbound("morning", at + 145 * 60000)], at);
   assert.equal(r.status, "ended");
+});
+
+test("le dernier tram est celui du soir, pas un tram du lendemain après 3 h", () => {
+  // L'API renvoie aussi les courses du lendemain (environ 12 h à venir).
+  const journeys = [eastbound("soir1", min(10)), eastbound("soir2", min(40)), eastbound("matin1", min(7 * 60)), eastbound("midi", min(13 * 60))];
+  const r = run(journeys);
+  assert.equal(r.status, "ok");
+  assert.equal(r.primary.last.journeyId, "soir2");
+  assert.equal(r.primary.leaveBy, min(40) + 4 * 60000 - r.primary.origin.walk.minutes * 60000 - WALK_MARGIN_MS);
+});
+
+test("après le dernier tram du soir : plus de tram ce soir, même si le lendemain est connu", () => {
+  const r = run([eastbound("soir", min(-30)), eastbound("matin1", min(7 * 60)), eastbound("midi", min(13 * 60))]);
+  assert.equal(r.status, "over");
 });
 
 test("correspondance : le dernier B qui attrape encore le dernier A", () => {
