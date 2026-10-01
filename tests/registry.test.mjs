@@ -51,6 +51,11 @@ test("l'adaptateur du dernier tram fournit les fonctions attendues", () => {
       assert.doesNotThrow(() => new Intl.DateTimeFormat("fr-FR", { timeZone: n.timeZone }), n.id);
       assert.ok(n.timeZone, `${n.id} : serviceEndHour sans timeZone`);
     }
+    // Début de la plage horaire du compte à rebours : n'a de sens qu'avec une fin de service.
+    if (a.serviceStartHour != null) {
+      assert.ok(Number.isInteger(a.serviceStartHour) && a.serviceStartHour >= 0 && a.serviceStartHour < 24, n.id);
+      assert.ok(a.serviceEndHour != null && a.serviceStartHour !== a.serviceEndHour, `${n.id} : serviceStartHour sans serviceEndHour`);
+    }
   }
 });
 

@@ -1,7 +1,7 @@
 // Type d'information « Le dernier tram pour rentrer » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc } from "../../core/util.js";
 import { openSheet, closeSheet, sheetOptions, sheetCurrent, sheetAction, sheetActions, sheetNote, AUTOMATIC } from "../../core/sheet.js";
@@ -18,6 +18,10 @@ const TICK_MS = 10 * 1000;
 const SOON_MIN = 20;
 const URGENT_MIN = 10;
 const PULSE_MIN = 5;
+// Au-delà d'une heure avant l'heure limite, le compteur affiche « plus d'1 h » et les horaires ne
+// sont plus rechargés automatiquement jusqu'à ce qu'il reste une heure. Le temps réel ne couvre de
+// toute façon qu'environ l'heure qui vient : avant, l'horaire prévu suffit.
+const LIVE_MIN = 60;
 
 // Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
 // une maison pour le domicile.
@@ -55,10 +59,23 @@ function mount({ root, network, adapter }) {
     leaveBy: null, // heure limite affichée par le compte à rebours
     countdownHtml: null, // dernière valeur affichée, pour animer le passage d'une minute
     entered: false, // l'écran est apparu une fois : les rendus suivants ne rejouent pas l'apparition
+    asleep: false, // hors de la plage horaire du réseau : écran d'attente, aucun calcul
+    quietUntil: null, // heure limite à plus d'1 h : pas de rafraîchissement automatique avant cette heure
     unmounted: false,
   };
 
   const area = network.area;
+
+  // Dans la plage horaire du réseau (de serviceStartHour à serviceEndHour), ou toujours s'il n'en a pas.
+  const hours = (h) => `${h} h`;
+  const awake = () =>
+    adapter.serviceStartHour == null ||
+    adapter.serviceEndHour == null ||
+    inServiceWindow(Date.now(), {
+      timeZone: network.timeZone,
+      startHour: adapter.serviceStartHour,
+      endHour: adapter.serviceEndHour,
+    });
 
   // ---------- Écrans ----------
 
@@ -97,6 +114,20 @@ function mount({ root, network, adapter }) {
     );
   }
 
+  // Hors de la plage horaire : écran d'attente neutre. Domicile et position restent modifiables.
+  function showAsleep() {
+    state.last = null;
+    const start = hours(adapter.serviceStartHour);
+    renderScreen({
+      hero: heroText(
+        "En attente",
+        `Dès ${start}`,
+        `Le compte à rebours du dernier ${esc(adapter.vehicle)} fonctionne de ${start} à ${hours(adapter.serviceEndHour)}.`,
+      ),
+      meta: false,
+    });
+  }
+
   function openPositionSheet(reason = location.issue ?? "Indiquez l'adresse ou le lieu d'où vous partez.") {
     const known = location.address?.label;
     const body = openSheet(
@@ -112,7 +143,7 @@ function mount({ root, network, adapter }) {
       types: "StreetAddress,PositionOfInterest",
       onSelect(address) {
         closeSheet();
-        showMessage("Calcul du trajet…");
+        if (!state.asleep) showMessage("Calcul du trajet…");
         state.lastComputedFrom = null;
         location.setManual(address); // l'abonnement ci-dessous lance le calcul
       },
@@ -124,8 +155,11 @@ function mount({ root, network, adapter }) {
   function start() {
     if (!state.home) return showWaitingForHome();
     state.lastComputedFrom = null;
+    state.asleep = !awake();
     const here = location.here;
-    if (here) {
+    if (state.asleep) {
+      showAsleep();
+    } else if (here) {
       if (!covers(network, here)) showOutsideNetwork();
       else {
         showMessage("Calcul du trajet…");
@@ -144,6 +178,7 @@ function mount({ root, network, adapter }) {
     if (state.unmounted) return;
     if (type === "address") return paintPosition();
     if (!state.home) return;
+    if (state.asleep) return paintPosition();
     if (type === "issue") {
       if (!location.here) showLocationUnknown(issue);
       return;
@@ -159,12 +194,21 @@ function mount({ root, network, adapter }) {
   function scheduleRefresh() {
     clearInterval(state.timer);
     state.timer = setInterval(() => {
-      if (document.visibilityState === "visible") compute();
+      if (document.visibilityState === "visible" && !windowChanged() && !quiet()) compute();
     }, REFRESH_MS);
   }
 
   function onVisibility() {
-    if (document.visibilityState === "visible" && location.here) compute();
+    if (document.visibilityState === "visible" && !windowChanged() && !quiet() && location.here) compute();
+  }
+
+  const quiet = () => state.quietUntil != null && Date.now() < state.quietUntil;
+
+  // Début ou fin de la plage horaire : on repart de zéro (écran d'attente ou premier calcul).
+  function windowChanged() {
+    if (!state.home || awake() !== state.asleep) return false;
+    start();
+    return true;
   }
 
   // ---------- Calcul ----------
@@ -212,7 +256,7 @@ function mount({ root, network, adapter }) {
   // ou premier calcul. Les rafraîchissements automatiques restent silencieux.
   async function compute({ visible = false } = {}) {
     const here = location.here;
-    if (state.unmounted || !state.home || !here || !covers(network, here)) return;
+    if (state.unmounted || state.asleep || !state.home || !here || !covers(network, here)) return;
     if (state.busy) {
       state.pending = true;
       state.pendingVisible ||= visible;
@@ -489,7 +533,11 @@ function mount({ root, network, adapter }) {
     // Heure limite dépassée de plus d'une minute : ce tram-là est perdu, en attendant le prochain calcul.
     const late = left < -60000;
     const minutes = Math.max(0, Math.floor(left / 60000));
-    const html = late ? `<span class="countdown-word">trop tard</span>` : countdownHtml(minutes);
+    const html = late
+      ? `<span class="countdown-word">trop tard</span>`
+      : left > LIVE_MIN * 60000
+        ? `<span class="countdown-word">plus d'1 h</span>`
+        : countdownHtml(minutes);
     el.innerHTML = html;
     // La valeur change (nouvelle minute) : les chiffres glissent en place.
     if (state.countdownHtml && state.countdownHtml !== html) {
@@ -514,6 +562,8 @@ function mount({ root, network, adapter }) {
     needPosition = false,
   }) {
     state.leaveBy = leaveBy;
+    // Rafraîchissements automatiques suspendus tant que l'heure limite est à plus d'une heure.
+    state.quietUntil = leaveBy != null ? leaveBy - LIVE_MIN * 60000 : null;
     // Ce qui manque pour calculer : d'abord le domicile, puis la position.
     const needs = !state.home ? "home" : needPosition ? "position" : null;
     const calloutText = {

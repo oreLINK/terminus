@@ -268,6 +268,12 @@ export function serviceEndAfter(now, { timeZone, hour }) {
   return end - offset;
 }
 
+// Plage horaire où le compte à rebours fonctionne (de 18 h à 3 h à Bordeaux), qui peut passer
+// minuit. On y est quand sa fin arrive avant son prochain début.
+export function inServiceWindow(now, { timeZone, startHour, endHour }) {
+  return serviceEndAfter(now, { timeZone, hour: endHour }) < serviceEndAfter(now, { timeZone, hour: startHour });
+}
+
 // Trajet complet à partir d'un départ du profil. Les champs du premier tronçon restent à la
 // racine (dep, lineCode…) : c'est le tram à prendre depuis l'arrêt de départ.
 function itinerary(entry, lineCodes) {

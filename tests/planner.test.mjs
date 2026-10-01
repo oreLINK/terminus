@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseJourneys } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
 
 // Ligne A fictive d'ouest en est : Ouest -> Centre -> Pont -> Est, un quai par sens.
 const A = "bordeaux:Line:59:LOC";
@@ -132,6 +132,20 @@ test("fin du service : la prochaine fois qu'il est 3 h du matin à Paris", () =>
   assert.equal(serviceEndAfter(paris("2026-09-28T01:00:00Z"), SERVICE), paris("2026-09-29T01:00:00Z"));
   // En hiver, Paris = UTC + 1.
   assert.equal(serviceEndAfter(paris("2026-12-01T12:00:00Z"), SERVICE), paris("2026-12-02T02:00:00Z"));
+});
+
+test("plage horaire : de 18 h à 3 h, heure de Paris, en passant minuit", () => {
+  const WINDOW = { timeZone: "Europe/Paris", startHour: 18, endHour: 3 };
+  const at = (iso) => inServiceWindow(Date.parse(iso), WINDOW);
+  assert.equal(at("2026-09-27T15:59:00Z"), false); // 17 h 59
+  assert.equal(at("2026-09-27T16:00:00Z"), true); // 18 h pile
+  assert.equal(at("2026-09-27T21:30:00Z"), true); // 23 h 30
+  assert.equal(at("2026-09-28T00:30:00Z"), true); // 2 h 30
+  assert.equal(at("2026-09-28T01:00:00Z"), false); // 3 h pile
+  assert.equal(at("2026-09-28T10:00:00Z"), false); // midi
+  // En hiver, Paris = UTC + 1.
+  assert.equal(at("2026-12-01T16:30:00Z"), false); // 17 h 30
+  assert.equal(at("2026-12-01T17:30:00Z"), true); // 18 h 30
 });
 
 test("service terminé : il est plus de 3 h et le premier tram est dans plus de 2 h", () => {
