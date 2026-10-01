@@ -6,7 +6,8 @@ import { FEATURES, DEFAULT_FEATURE, featuresFor } from "./features/index.js";
 import { location } from "./core/location.js";
 import { openSheet, closeSheet, sheetOptions, sheetNote, boltSvg, AUTOMATIC } from "./core/sheet.js";
 import { readJSON, writeJSON } from "./core/storage.js";
-import { esc } from "./core/util.js";
+import { esc, clock } from "./core/util.js";
+import { lab, now, clearLab } from "./core/lab.js";
 
 const PREFS_KEY = "dt.prefs.v1"; // { city: "auto" | id, feature: "auto" | id, lastNetwork: id }
 
@@ -145,5 +146,25 @@ document.addEventListener("click", (e) => {
 location.subscribe(({ type }) => {
   if (type === "position" && prefs.city === "auto") mount();
 });
+
+// Mode test (local seulement) : un bandeau le rappelle, avec l'heure simulée et la sortie.
+if (lab) {
+  const bar = document.createElement("div");
+  bar.className = "lab-banner";
+  bar.innerHTML = `<span>Mode test${lab.clock != null ? ` · <span id="lab-clock"></span>` : ""}</span>
+    <a href="lab/">Réglages</a>
+    <button type="button" id="lab-quit">Quitter</button>`;
+  document.body.prepend(bar);
+  const paintClock = () => {
+    const el = document.getElementById("lab-clock");
+    if (el) el.textContent = `il est ${clock(now())}`;
+  };
+  paintClock();
+  setInterval(paintClock, 10 * 1000);
+  document.getElementById("lab-quit").addEventListener("click", () => {
+    clearLab();
+    globalThis.location.reload();
+  });
+}
 
 mount();

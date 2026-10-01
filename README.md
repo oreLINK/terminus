@@ -25,6 +25,8 @@ npm run serve
 
 Ouvrez `http://localhost:8000`. Le serveur (`tools/serve.py`) interdit le cache du navigateur : sans cela, les modules JS restent en cache plusieurs heures et l'ancien code s'exécute après une modification. Si vous utilisez un autre serveur, rechargez sans le cache (Cmd+Maj+R). Le site utilise des modules ES et ne fonctionne pas en ouvrant directement `index.html` avec `file://`. La géolocalisation est disponible sur `localhost` et en production sur HTTPS.
 
+Pour tester l'affichage à n'importe quelle heure (heure simulée, plage horaire, compteur ou écran forcé), ouvrez `http://localhost:8000/lab/`. Ce mode ne fonctionne qu'en local et la page n'est pas publiée.
+
 Exécutez la suite de tests avant de proposer un changement :
 
 ```sh
@@ -120,6 +122,7 @@ js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)
 tools/serve.py                       serveur local sans cache (npm run serve)
+lab/                                page de tests locale (heure simulée, écrans forcés), jamais publiée
 js/features/index.js                 registre des types d'information
 js/features/last-ride/               « Le dernier tram pour rentrer » : écrans et calcul pur
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite

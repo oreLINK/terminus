@@ -83,6 +83,8 @@ js/networks/bordeaux-tbm/siri-lite.js  appels SIRI-Lite, lecture des réponses, 
 js/networks/bordeaux-tbm/graph.js   graphe du réseau (généré, versionné) : ordre des arrêts par ligne et par sens
 tools/build-graph.mjs               génère graph.js depuis l'API (npm run graph)
 tools/serve.py                      serveur local sans cache (npm run serve)
+lab/index.html                      page de tests, locale seulement, jamais publiée (voir section 9)
+js/core/lab.js                      réglages du mode test, inertes hors de localhost ; horloge du site now()
 js/features/index.js                registre des types d'information, DEFAULT_FEATURE
 js/features/last-ride/index.js      « Le dernier tram pour rentrer » : écrans, calcul, feuilles
 js/features/last-ride/planner.js    logique pure : stations, candidats, options
@@ -165,6 +167,7 @@ Temps de marche (`util.js`) : distance à vol d'oiseau × 1,3, à 78 m/min (envi
 | `dt.homes.v1` | `{ [networkId]: { label, lat, lon } }` : un domicile par réseau |
 | `dt.home.v1` | ancien domicile unique ; lu une fois et recopié dans `dt.homes.v1` sous `bordeaux-tbm` (`legacyHomeKey`), jamais écrit |
 | `dt.prefs.v1` | `{ city: "auto" \| networkId, feature: "auto" \| featureId, lastNetwork }` : choix de l'en-tête |
+| `dt.lab.v1` | réglages du mode test, local seulement (`lab/index.html`) : `{ clock, setAt, startHour, endHour, liveMin, countdownMin, screen }` |
 | `dt.network.v1` | cache du réseau TBM (`siri-lite.js`) : `{ at, data: { lines, stops } }`, lignes de tram et points d'arrêt filtrés, 24 h |
 
 Tous les accès à `localStorage` sont dans des `try/catch` : le site fonctionne (sans mémoire) en navigation privée stricte. Changer le format d'une clé → incrémenter son suffixe de version.
@@ -195,6 +198,7 @@ Intention : lisible d'une main, la nuit, dehors. **Un seul élément fort : le c
 ## 9. Tests et vérification
 
 - `npm test` (Node 18+) : 24 tests. `planner.test.mjs` (18) : le regroupement en stations, les lignes à charger sans graphe, les (ligne, sens) choisis d'après le graphe (direct, correspondance, correspondance de plus sur demande, arrêt inconnu et graphe sans trajet), le choix du dernier tram indépendamment de l'ordre du JSON, l'exclusion des courses partielles, les trams inatteignables à pied, les statuts `none`/`missed`/`over`/`ended`, les correspondances (dernier B qui attrape encore le dernier A, marge de changement de quai, direct préféré et correspondance plus tardive signalée, relais par la correspondance quand le direct est manqué), et la lecture du format Mecatran. `registry.test.mjs` (6) : complétude des réseaux et des types d'information, adaptateur `last-ride`, format du graphe (sens 0/1, chaque ligne dans les deux sens, chaque quai nommé), choix de la ville d'après la position, domicile par réseau et reprise de `dt.home.v1`.
+- **Mode test (lab)**, pour les tests visuels à toute heure : `npm run serve`, puis `http://localhost:8000/lab/`. La page enregistre des réglages dans `dt.lab.v1`, que le site lit via `js/core/lab.js` : heure simulée (elle avance à partir de l'heure choisie ; `now()` remplace `Date.now()` dans `last-ride`, pas dans les caches), plage horaire, seuil « plus d'1 h », compteur forcé à N minutes (tons et pulsation), écran forcé sans appel à l'API (attente, manqué, terminé, aucun tram, erreur, à deux pas). Un bandeau rayé « Mode test » rappelle l'heure simulée et permet de quitter. Sécurité : `lab/` n'est pas copié par `deploy.yml`, et `lab` vaut `null` hors de `localhost` / `127.0.0.1`, même si la clé existe (test `tests/lab.test.mjs`). Choix de l'auteur, 01/10/2026 : pas de page de tests publiée.
 - Test local du site : `npm run serve` (`tools/serve.py`, qui envoie `Cache-Control: no-store`) puis `http://localhost:8000` (les modules ES ne se chargent pas en `file://`). Avec `python3 -m http.server`, sans en-tête de cache, le navigateur garde les anciens modules plusieurs heures : constaté le 30/09/2026, l'ancien calcul sans correspondance s'exécutait encore après la mise à jour.
 - Le rendu a été vérifié dans Chromium headless avec des réponses d'API simulées, en clair et en sombre.
 
