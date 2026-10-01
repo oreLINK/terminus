@@ -10,6 +10,7 @@ import { setComputing } from "../../core/computing.js";
 import { setAmbient } from "../../core/ambient.js";
 import { getHome, saveHome } from "../../core/home.js";
 import { covers } from "../../networks/index.js";
+import { lab, now as clockNow } from "../../core/lab.js";
 
 const REFRESH_MS = 30 * 1000;
 const MOVE_THRESHOLD_M = 150;
@@ -22,6 +23,10 @@ const PULSE_MIN = 5;
 // sont plus rechargés automatiquement jusqu'à ce qu'il reste une heure. Le temps réel ne couvre de
 // toute façon qu'environ l'heure qui vient : avant, l'horaire prévu suffit.
 const LIVE_MIN = 60;
+// Âge maximal des horaires en cache : court pour les lignes du tracé affiché (temps réel), long pour
+// les autres, qui ne servent qu'à vérifier qu'aucun tracé ne laisse partir plus tard.
+const ROUTE_MAX_AGE_MS = 100 * 1000;
+const OTHER_MAX_AGE_MS = 15 * 60 * 1000;
 
 // Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
 // une maison pour le domicile.
@@ -60,21 +65,23 @@ function mount({ root, network, adapter }) {
     entered: false, // l'écran est apparu une fois : les rendus suivants ne rejouent pas l'apparition
     asleep: false, // hors de la plage horaire du réseau : écran d'attente, aucun calcul
     quietUntil: null, // heure limite à plus d'1 h : pas de rafraîchissement automatique avant cette heure
+    routeLines: new Set(), // lignes du tracé affiché : leurs horaires sont rechargés plus souvent
     unmounted: false,
   };
 
   const area = network.area;
 
+  // Réglages du réseau, que le mode test (js/core/lab.js, local seulement) peut remplacer.
+  const startHour = lab?.startHour ?? adapter.serviceStartHour;
+  const endHour = lab?.endHour ?? adapter.serviceEndHour;
+  const liveMs = (lab?.liveMin ?? LIVE_MIN) * 60000;
+
   // Dans la plage horaire du réseau (de serviceStartHour à serviceEndHour), ou toujours s'il n'en a pas.
   const hours = (h) => `${h} h`;
   const awake = () =>
-    adapter.serviceStartHour == null ||
-    adapter.serviceEndHour == null ||
-    inServiceWindow(Date.now(), {
-      timeZone: network.timeZone,
-      startHour: adapter.serviceStartHour,
-      endHour: adapter.serviceEndHour,
-    });
+    startHour == null ||
+    endHour == null ||
+    inServiceWindow(clockNow(), { timeZone: network.timeZone, startHour, endHour });
 
   // ---------- Écrans ----------
 
@@ -116,12 +123,12 @@ function mount({ root, network, adapter }) {
   // Hors de la plage horaire : écran d'attente neutre. Domicile et position restent modifiables.
   function showAsleep() {
     state.last = null;
-    const start = hours(adapter.serviceStartHour);
+    const start = hours(startHour);
     renderScreen({
       hero: heroText(
         "En attente",
         `Dès ${start}`,
-        `Le compte à rebours du dernier ${esc(adapter.vehicle)} fonctionne de ${start} à ${hours(adapter.serviceEndHour)}.`,
+        `Le compte à rebours du dernier ${esc(adapter.vehicle)} fonctionne de ${start} à ${hours(endHour)}.`,
       ),
       meta: false,
     });
@@ -156,7 +163,9 @@ function mount({ root, network, adapter }) {
     state.lastComputedFrom = null;
     state.asleep = !awake();
     const here = location.here;
-    if (state.asleep) {
+    if (lab?.screen) {
+      showForced(lab.screen);
+    } else if (state.asleep) {
       showAsleep();
     } else if (here) {
       if (!covers(network, here)) showOutsideNetwork();
@@ -201,11 +210,11 @@ function mount({ root, network, adapter }) {
     if (document.visibilityState === "visible" && !windowChanged() && !quiet() && location.here) compute();
   }
 
-  const quiet = () => state.quietUntil != null && Date.now() < state.quietUntil;
+  const quiet = () => state.quietUntil != null && clockNow() < state.quietUntil;
 
   // Début ou fin de la plage horaire : on repart de zéro (écran d'attente ou premier calcul).
   function windowChanged() {
-    if (!state.home || awake() !== state.asleep) return false;
+    if (!state.home || lab?.screen || awake() !== state.asleep) return false;
     start();
     return true;
   }
@@ -242,10 +251,13 @@ function mount({ root, network, adapter }) {
     return [routeRequests(args), routeRequests({ ...args, extraTransfers: 1 }), all];
   }
 
-  // Les courses des (ligne, sens) demandés. Un échec partiel est signalé
+  // Les courses des (ligne, sens) demandés, jusqu'à la fin du service. Un échec partiel est signalé
   // sans bloquer ; si rien ne répond, l'erreur remonte.
-  async function loadJourneys(requests) {
-    const settled = await Promise.allSettled(requests.map((r) => adapter.loadTimetable(r.line, r.direction)));
+  async function loadJourneys(requests, until) {
+    const maxAge = (r) => (state.routeLines.has(r.line) ? ROUTE_MAX_AGE_MS : OTHER_MAX_AGE_MS);
+    const settled = await Promise.allSettled(
+      requests.map((r) => adapter.loadTimetable(r.line, r.direction, { until, maxAge: maxAge(r) })),
+    );
     const failed = settled.filter((r) => r.status === "rejected");
     if (settled.length && failed.length === settled.length) throw failed[0].reason;
     return { journeys: settled.filter((r) => r.status === "fulfilled").flatMap((r) => r.value), failed: failed.length };
@@ -255,7 +267,7 @@ function mount({ root, network, adapter }) {
   // ou premier calcul. Les rafraîchissements automatiques restent silencieux.
   async function compute({ visible = false } = {}) {
     const here = location.here;
-    if (state.unmounted || state.asleep || !state.home || !here || !covers(network, here)) return;
+    if (state.unmounted || state.asleep || lab?.screen || !state.home || !here || !covers(network, here)) return;
     if (state.busy) {
       state.pending = true;
       state.pendingVisible ||= visible;
@@ -280,23 +292,27 @@ function mount({ root, network, adapter }) {
       let journeys = [];
       let failed = 0;
       let result = null;
-      let now = Date.now();
-      for (const stage of loadStages(origins, dests)) {
+      let now = clockNow();
+      const serviceEnd =
+        endHour == null ? Infinity : serviceEndAfter(now, { timeZone: network.timeZone, hour: endHour });
+      const stages = loadStages(origins, dests);
+      for (const stage of stages) {
         const todo = stage.filter((r) => !loaded.has(`${r.line}|${r.direction}`));
         if (result && !todo.length) continue;
         for (const r of todo) loaded.add(`${r.line}|${r.direction}`);
-        const got = await loadJourneys(todo);
+        const got = await loadJourneys(todo, serviceEnd);
         if (state.unmounted) return;
         journeys = journeys.concat(got.journeys);
         failed += got.failed;
-        now = Date.now();
-        const serviceEnd =
-          adapter.serviceEndHour == null
-            ? Infinity
-            : serviceEndAfter(now, { timeZone: network.timeZone, hour: adapter.serviceEndHour });
+        now = clockNow();
         result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd });
         if (result.options.length) break;
       }
+      // Les horaires ne couvrent que jusqu'à la fin du service : l'API ne renvoie alors presque plus
+      // les courses passées, et « le dernier tram est parti » ne se voit plus dans les données.
+      // Si le graphe relie les deux côtés et qu'il ne reste aucun tram, c'est que le dernier est parti.
+      if (result?.status === "none" && state.graph && stages[0].length) result = { ...result, status: "over" };
+      state.routeLines = new Set(result?.primary?.last.legs.map((l) => l.line) ?? []);
 
       state.lastComputedFrom = here;
       state.last = { result, origins, dests, now, partial: failed > 0 };
@@ -493,13 +509,14 @@ function mount({ root, network, adapter }) {
   function paintCountdown() {
     const el = root.querySelector("#countdown");
     if (!el || state.leaveBy == null) return;
-    const left = state.leaveBy - Date.now();
+    // Mode test : compteur fixé à une valeur choisie, pour voir chaque ton.
+    const left = lab?.countdownMin != null ? lab.countdownMin * 60000 : state.leaveBy - clockNow();
     // Heure limite dépassée de plus d'une minute : ce tram-là est perdu, en attendant le prochain calcul.
     const late = left < -60000;
     const minutes = Math.max(0, Math.floor(left / 60000));
     const html = late
       ? `<span class="countdown-word">trop tard</span>`
-      : left > LIVE_MIN * 60000
+      : left > liveMs
         ? `<span class="countdown-word">plus d'1 h</span>`
         : countdownHtml(minutes);
     el.innerHTML = html;
@@ -519,7 +536,7 @@ function mount({ root, network, adapter }) {
 
   function renderScreen({
     hero,
-    now = Date.now(),
+    now = clockNow(),
     partial = false,
     leaveBy = null,
     meta = true,
@@ -527,7 +544,7 @@ function mount({ root, network, adapter }) {
   }) {
     state.leaveBy = leaveBy;
     // Rafraîchissements automatiques suspendus tant que l'heure limite est à plus d'une heure.
-    state.quietUntil = leaveBy != null ? leaveBy - LIVE_MIN * 60000 : null;
+    state.quietUntil = leaveBy != null ? leaveBy - liveMs : null;
     // Ce qui manque pour calculer : d'abord le domicile, puis la position.
     const needs = !state.home ? "home" : needPosition ? "position" : null;
     const calloutText = {
@@ -589,46 +606,56 @@ function mount({ root, network, adapter }) {
   function renderLast() {
     const { result, now, partial } = state.last;
     const option = result.primary ?? null;
-    const night = network.nightHint ? ` ${network.nightHint}` : "";
-
-    let hero;
-    let leaveBy = null;
     if (option && !isEnded(option, now)) {
-      hero = heroCountdown(option);
-      leaveBy = option.leaveBy;
-    } else if (option) {
-      hero = heroText(
+      return renderScreen({ hero: heroCountdown(option), now, partial, leaveBy: option.leaveBy });
+    }
+    renderScreen({ hero: endHero(result.status, option), now, partial });
+  }
+
+  // Pas de compte à rebours : service terminé, dernier tram manqué ou parti, aucun trajet.
+  function endHero(status, option) {
+    const night = network.nightHint ? ` ${network.nightHint}` : "";
+    if (option) {
+      return heroText(
         "Service terminé",
         "Plus de tram ce soir",
         `Premier tram ${badges([option.next.lineCode])} vers chez vous à ${clock(option.next.dep)}.`,
         "",
         "late",
       );
-    } else if (result.status === "missed") {
-      hero = heroText(
+    }
+    if (status === "missed") {
+      return heroText(
         "Dernier tram manqué",
         "Trop tard à pied",
         `Le dernier tram vers chez vous part avant que vous puissiez rejoindre l'arrêt.${esc(night)}`,
         "",
         "late",
       );
-    } else if (result.status === "over") {
-      hero = heroText(
+    }
+    if (status === "over") {
+      return heroText(
         "Service terminé",
         "Plus de tram ce soir",
         `Le dernier tram vers chez vous est parti.${esc(night)}`,
         "",
         "late",
       );
-    } else {
-      hero = heroText(
-        "Aucun tram",
-        "Plus de tram d'ici",
-        `Aucun tram ne relie les arrêts proches de vous à chez vous d'ici la fin du service, même avec correspondance.${esc(night)}`,
-      );
     }
+    return heroText(
+      "Aucun tram",
+      "Plus de tram d'ici",
+      `Aucun tram ne relie les arrêts proches de vous à chez vous d'ici la fin du service, même avec correspondance.${esc(night)}`,
+    );
+  }
 
-    renderScreen({ hero, now, partial, leaveBy });
+  // Mode test : un écran affiché tel quel, sans calcul ni appel à l'API.
+  function showForced(screen) {
+    state.last = null;
+    if (screen === "asleep") return showAsleep();
+    if (screen === "home") return renderAtHome();
+    if (screen === "error") return renderError(new Error("Erreur simulée (mode test)."));
+    renderScreen({ hero: endHero(screen, null) });
   }
 
   function renderAtHome() {

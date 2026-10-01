@@ -1,7 +1,14 @@
 // Réseau TBM, Bordeaux Métropole.
 // Décrit la ville et, pour chaque type d'information qu'il sait fournir, l'adaptateur de données.
 
-import { loadNetwork, loadTimetable, clearTimetableCache } from "./siri-lite.js";
+import { loadTimetable, clearTimetableCache } from "./siri-lite.js";
+
+// Ancien cache du réseau (lignes et arrêts lus dans l'API, ~24 h), remplacé par stops.js : on libère la place.
+try {
+  localStorage.removeItem("dt.network.v1");
+} catch {
+  // Stockage indisponible : rien à effacer.
+}
 
 export default {
   id: "bordeaux-tbm",
@@ -43,8 +50,9 @@ export default {
       // Le compte à rebours ne tourne qu'en soirée, de 18 h jusqu'à la fin du service ; un écran
       // d'attente s'affiche le reste du temps, sans appel à l'API.
       serviceStartHour: 18,
-      loadStops: loadNetwork, // → { lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }
-      loadTimetable, // (lineRef, direction) → [{ id, line, headsign, calls: [...] }]
+      // Lignes et arrêts de tram, générés par tools/build-graph.mjs : aucun appel à l'API.
+      loadStops: () => import("./stops.js").then((m) => m.default), // → { lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }
+      loadTimetable, // (lineRef, direction, { until, maxAge }) → [{ id, line, headsign, calls: [...] }]
       // Ordre des arrêts par ligne et par sens, généré par tools/build-graph.mjs, chargé à la demande.
       loadGraph: () => import("./graph.js").then((m) => m.default), // → { names, patterns: [{ line, direction, stops }] }
       clearCache: clearTimetableCache,
