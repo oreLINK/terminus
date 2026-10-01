@@ -25,6 +25,8 @@ npm run serve
 
 Ouvrez `http://localhost:8000`. Le serveur (`tools/serve.py`) interdit le cache du navigateur : sans cela, les modules JS restent en cache plusieurs heures et l'ancien code s'exécute après une modification. Si vous utilisez un autre serveur, rechargez sans le cache (Cmd+Maj+R). Le site utilise des modules ES et ne fonctionne pas en ouvrant directement `index.html` avec `file://`. La géolocalisation est disponible sur `localhost` et en production sur HTTPS.
 
+Pour tester l'affichage à n'importe quelle heure (heure simulée, plage horaire, compteur ou écran forcé), ouvrez `http://localhost:8000/lab/`. Ce mode ne fonctionne qu'en local et la page n'est pas publiée.
+
 Exécutez la suite de tests avant de proposer un changement :
 
 ```sh
@@ -41,7 +43,9 @@ Ajoutez ou adaptez un test lorsque le comportement calculé change. Toute modifi
 npm run graph
 ```
 
-Relancez-le après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée** : le soir, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
+La même commande génère `js/networks/bordeaux-tbm/stops.js` : les lignes et arrêts de tram, que le site charge sans appeler l'API (`npm run graph -- --stops-only` ne régénère que lui).
+
+Relancez-la après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée et hors travaux** : le soir ou un jour de travaux, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
 
 ## Branches, contributions et GitHub
 
@@ -120,6 +124,7 @@ js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)
 tools/serve.py                       serveur local sans cache (npm run serve)
+lab/                                page de tests locale (heure simulée, écrans forcés), jamais publiée
 js/features/index.js                 registre des types d'information
 js/features/last-ride/               « Le dernier tram pour rentrer » : écrans et calcul pur
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite

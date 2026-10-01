@@ -1,0 +1,255 @@
+<!doctype html>
+<!-- Page de tests, locale seulement : jamais publiée (deploy.yml ne copie pas lab/), et inerte
+     hors de localhost. Les réglages sont enregistrés dans localStorage (dt.lab.v1), puis lus par
+     le site via js/core/lab.js. -->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Terminus lab</title>
+  <style>
+    :root {
+      --bg: #F4F6F8;
+      --card: #FFFFFF;
+      --ink: #12202E;
+      --muted: #4D5B69;
+      --line: #D5DCE3;
+      --accent: #8F5400;
+      --chip: #EEF1F4;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0E1620;
+        --card: #16212D;
+        --ink: #EEF2F5;
+        --muted: #A5B4C2;
+        --line: #2A3A4A;
+        --accent: #FFB547;
+        --chip: #1F2C3A;
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #0E1620;
+      --card: #16212D;
+      --ink: #EEF2F5;
+      --muted: #A5B4C2;
+      --line: #2A3A4A;
+      --accent: #FFB547;
+      --chip: #1F2C3A;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px 16px 48px;
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
+    h1 { margin: 0; font-size: 1.5rem; }
+    .lead { margin: 0; color: var(--muted); }
+    fieldset {
+      margin: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--card);
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+    legend { padding: 0 6px; font-weight: 700; }
+    label { display: grid; gap: 4px; font-size: 0.9375rem; }
+    .hint { margin: 0; font-size: 0.8125rem; color: var(--muted); }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .row > label { flex: 1 1 120px; }
+    input, select {
+      width: 100%;
+      min-height: 44px;
+      padding: 8px 10px;
+      font: inherit;
+      color: inherit;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chips button {
+      min-height: 36px;
+      padding: 4px 12px;
+      font: inherit;
+      font-size: 0.875rem;
+      color: inherit;
+      background: var(--chip);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .actions button {
+      flex: 1 1 200px;
+      min-height: 48px;
+      font: inherit;
+      font-weight: 700;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .primary { color: var(--bg); background: var(--accent); border: 0; }
+    .secondary { color: inherit; background: transparent; border: 1px solid var(--line); }
+    .blocked {
+      padding: 16px;
+      border-radius: 14px;
+      background: var(--card);
+      border: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Terminus lab</h1>
+    <p class="lead">Réglages de test appliqués au site sur ce navigateur. Laisser un champ vide garde la valeur réelle.</p>
+
+    <p class="blocked" id="blocked" hidden>Cette page ne fonctionne qu'en local : lancez <code>npm run serve</code> puis ouvrez <code>http://localhost:8000/lab/</code>.</p>
+
+    <form id="form">
+      <div style="display: grid; gap: 16px;">
+        <fieldset>
+          <legend>Heure simulée</legend>
+          <label>Date et heure (heure de ce navigateur)
+            <input type="datetime-local" name="clock">
+          </label>
+          <div class="chips" data-target="clock">
+            <button type="button" data-time="17:55">17 h 55</button>
+            <button type="button" data-time="18:00">18 h</button>
+            <button type="button" data-time="22:30">22 h 30</button>
+            <button type="button" data-time="23:45">23 h 45</button>
+            <button type="button" data-time="00:30">0 h 30</button>
+            <button type="button" data-time="02:55">2 h 55</button>
+            <button type="button" data-time="03:05">3 h 05</button>
+          </div>
+          <p class="hint">L'horloge avance à partir de cette heure. Les horaires viennent de la vraie API : ils couvrent la journée en cours et environ les 12 heures à venir, donc une heure de ce soir donne des résultats réalistes.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Plage horaire et seuils</legend>
+          <div class="row">
+            <label>Début (h)
+              <input type="number" name="startHour" min="0" max="23" placeholder="18">
+            </label>
+            <label>Fin du service (h)
+              <input type="number" name="endHour" min="0" max="23" placeholder="3">
+            </label>
+            <label>Seuil « plus d'1 h » (min)
+              <input type="number" name="liveMin" min="1" max="600" placeholder="60">
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Compteur forcé</legend>
+          <label>Minutes affichées (le calcul et l'itinéraire restent réels)
+            <input type="number" name="countdownMin" min="-10" max="600" placeholder="réel">
+          </label>
+          <div class="chips" data-target="countdownMin">
+            <button type="button" data-value="90">90 (plus d'1 h)</button>
+            <button type="button" data-value="45">45 (vert)</button>
+            <button type="button" data-value="15">15 (orange)</button>
+            <button type="button" data-value="7">7 (rouge)</button>
+            <button type="button" data-value="3">3 (pulsation)</button>
+            <button type="button" data-value="0">0 (maintenant)</button>
+            <button type="button" data-value="-2">−2 (trop tard)</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Écran forcé</legend>
+          <label>Affiché tel quel, sans calcul ni appel à l'API
+            <select name="screen">
+              <option value="">Aucun (calcul réel)</option>
+              <option value="asleep">En attente (hors plage horaire)</option>
+              <option value="missed">Dernier tram manqué</option>
+              <option value="over">Service terminé</option>
+              <option value="none">Aucun tram</option>
+              <option value="error">Horaires indisponibles</option>
+              <option value="home">À deux pas de chez vous</option>
+            </select>
+          </label>
+          <p class="hint">Un domicile doit être enregistré sur le site : sans lui, c'est l'écran « Ajoutez votre domicile » qui s'affiche.</p>
+        </fieldset>
+
+        <div class="actions">
+          <button type="submit" class="primary">Appliquer et ouvrir le site</button>
+          <button type="button" class="secondary" id="reset">Tout réinitialiser</button>
+        </div>
+      </div>
+    </form>
+  </main>
+
+  <script type="module">
+    import { LOCAL, lab, saveLab, clearLab } from "../js/core/lab.js";
+
+    const form = document.getElementById("form");
+    const field = (name) => form.elements[name];
+    const pad = (n) => String(n).padStart(2, "0");
+    const toInput = (ms) => {
+      const d = new Date(ms);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    if (!LOCAL) {
+      document.getElementById("blocked").hidden = false;
+      form.hidden = true;
+    } else if (lab) {
+      // L'heure simulée a avancé depuis son réglage : on la montre telle qu'elle est maintenant.
+      if (lab.clock != null) field("clock").value = toInput(lab.clock + (Date.now() - lab.setAt));
+      for (const name of ["startHour", "endHour", "liveMin", "countdownMin", "screen"]) {
+        if (lab[name] != null) field(name).value = lab[name];
+      }
+    }
+
+    // Raccourcis : une heure de la soirée en cours (avant midi = la nuit qui suit), ou une valeur.
+    form.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chips button");
+      if (!chip) return;
+      const target = chip.parentElement.dataset.target;
+      if (chip.dataset.time) {
+        const [h, m] = chip.dataset.time.split(":").map(Number);
+        const d = new Date();
+        if (d.getHours() >= 12 && h < 12) d.setDate(d.getDate() + 1);
+        d.setHours(h, m, 0, 0);
+        field(target).value = toInput(d.getTime());
+      } else {
+        field(target).value = chip.dataset.value;
+      }
+    });
+
+    const number = (name) => (field(name).value === "" ? undefined : Number(field(name).value));
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const clock = field("clock").value ? new Date(field("clock").value).getTime() : undefined;
+      const settings = {
+        clock,
+        setAt: clock != null ? Date.now() : undefined,
+        startHour: number("startHour"),
+        endHour: number("endHour"),
+        liveMin: number("liveMin"),
+        countdownMin: number("countdownMin"),
+        screen: field("screen").value || undefined,
+      };
+      if (Object.values(settings).every((v) => v === undefined)) clearLab();
+      else saveLab(settings);
+      globalThis.location.href = "../";
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      clearLab();
+      form.reset();
+    });
+  </script>
+</body>
+</html>

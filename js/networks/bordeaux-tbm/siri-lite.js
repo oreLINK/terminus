@@ -5,9 +5,9 @@
 const BASE = "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux";
 const KEY = "opendata-bordeaux-metropole-flux-gtfs-rt";
 
-const NETWORK_CACHE_KEY = "dt.network.v1";
-const NETWORK_TTL_MS = 24 * 3600 * 1000;
 const TIMETABLE_TTL_MS = 100 * 1000;
+const TIMETABLES_KEY = "dt.timetables.v1"; // sessionStorage : horaires gardés pour la soirée
+const TIMETABLES_KEEP_MS = 15 * 60 * 1000;
 
 export class ApiError extends Error {
   constructor(kind, message) {
@@ -46,33 +46,11 @@ async function siri(endpoint, params = {}, signal) {
   return res.json();
 }
 
-function readCache(key, ttl) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const { at, data } = JSON.parse(raw);
-    return Date.now() - at < ttl ? data : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCache(key, data) {
-  try {
-    localStorage.setItem(key, JSON.stringify({ at: Date.now(), data }));
-  } catch {
-    // Stockage plein ou désactivé : on recharge simplement au prochain passage.
-  }
-}
-
 const isTramLine = (name, code) => /^tram\b/i.test(name) && /^[a-f]$/i.test(code);
 
-// Lignes de tram + points d'arrêt physiques desservis par au moins un tram.
-// Mis en cache 24 h : ces données ne changent qu'avec les évolutions du réseau.
+// Lignes de tram + points d'arrêt physiques desservis par au moins un tram. Appelé seulement par
+// tools/build-graph.mjs, qui en tire stops.js : le site ne fait plus ces deux appels lourds.
 export async function loadNetwork() {
-  const cached = readCache(NETWORK_CACHE_KEY, NETWORK_TTL_MS);
-  if (cached) return cached;
-
   const [linesJson, stopsJson] = await Promise.all([
     siri("lines-discovery.json"),
     siri("stoppoints-discovery.json"),
@@ -98,9 +76,7 @@ export async function loadNetwork() {
     throw new ApiError("data", "Les données du réseau TBM sont incomplètes pour le moment.");
   }
 
-  const network = { lines, stops };
-  writeCache(NETWORK_CACHE_KEY, network);
-  return network;
+  return { lines, stops };
 }
 
 export function parseJourneys(json) {
@@ -141,25 +117,71 @@ export function parseJourneys(json) {
   return out;
 }
 
-// Toutes les courses restantes de la journée commerciale pour une ligne et un sens.
-// PreviewInterval est plafonné par le serveur à la fin de la journée commerciale,
-// ce qui donne jusqu'au dernier tram (y compris après minuit).
-const timetableCache = new Map();
+// Horaires par ligne et par sens : en mémoire, et recopiés dans sessionStorage pour qu'un
+// rechargement de la page dans la soirée ne refasse pas les appels. Le stockage est « au mieux » :
+// une ligne lue pèse jusqu'à ~500 Ko, et un quota dépassé laisse simplement le cache en mémoire.
+const timetableCache = new Map(readTimetables());
+const pending = new Map(); // appels en cours : deux demandes identiques n'en font qu'une
 
-export async function loadTimetable(lineRef, direction, { signal } = {}) {
+function readTimetables() {
+  try {
+    const entries = JSON.parse(globalThis.sessionStorage?.getItem(TIMETABLES_KEY)) ?? [];
+    return entries.filter(([, e]) => Date.now() - e.at < TIMETABLES_KEEP_MS);
+  } catch {
+    return [];
+  }
+}
+
+function writeTimetables() {
+  try {
+    globalThis.sessionStorage?.setItem(TIMETABLES_KEY, JSON.stringify([...timetableCache]));
+  } catch {
+    try {
+      globalThis.sessionStorage?.removeItem(TIMETABLES_KEY);
+    } catch {
+      // Stockage indisponible : le cache reste en mémoire.
+    }
+  }
+}
+
+// PreviewInterval couvrant de maintenant à `until` (fin du service), plus une heure de marge pour
+// les courses parties avant et pas encore arrivées. Sans fin connue : 24 h. Mesuré le 01/10/2026
+// sur le tram A : PT24H pèse 3,3 Mo (1,3 s), PT6H 590 Ko, PT1H 265 Ko. Un intervalle court ne
+// renvoie presque plus les courses déjà passées.
+function previewInterval(until) {
+  if (!Number.isFinite(until)) return "PT24H";
+  const hours = Math.ceil((until - Date.now()) / 3600000) + 1;
+  return `PT${Math.min(24, Math.max(1, hours))}H`;
+}
+
+// Courses d'une ligne dans un sens, de maintenant jusqu'à `until`. `maxAge` : âge maximal d'un
+// résultat en cache (court pour le temps réel du trajet affiché, plus long pour les autres lignes).
+export async function loadTimetable(lineRef, direction, { until = Infinity, maxAge = TIMETABLE_TTL_MS, signal } = {}) {
   const key = `${lineRef}|${direction}`;
+  const reach = Number.isFinite(until) ? until : null; // null : sans limite (JSON ne garde pas Infinity)
   const hit = timetableCache.get(key);
-  if (hit && Date.now() - hit.at < TIMETABLE_TTL_MS) return hit.journeys;
-  const json = await siri(
-    "estimated-timetable.json",
-    { LineRef: lineRef, DirectionRef: direction, PreviewInterval: "PT24H" },
-    signal,
-  );
-  const journeys = parseJourneys(json);
-  timetableCache.set(key, { at: Date.now(), journeys });
-  return journeys;
+  const covers = hit && (hit.until === null || (reach !== null && hit.until >= reach));
+  if (covers && Date.now() - hit.at < maxAge) return hit.journeys;
+
+  const interval = previewInterval(until);
+  const call = `${key}|${interval}`;
+  if (!pending.has(call)) {
+    pending.set(
+      call,
+      siri("estimated-timetable.json", { LineRef: lineRef, DirectionRef: direction, PreviewInterval: interval }, signal)
+        .then((json) => {
+          const journeys = parseJourneys(json);
+          timetableCache.set(key, { at: Date.now(), until: reach, journeys });
+          writeTimetables();
+          return journeys;
+        })
+        .finally(() => pending.delete(call)),
+    );
+  }
+  return pending.get(call);
 }
 
 export function clearTimetableCache() {
   timetableCache.clear();
+  writeTimetables();
 }
