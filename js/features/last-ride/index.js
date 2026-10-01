@@ -1,10 +1,10 @@
 // Type d'information « Le dernier tram pour rentrer » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc } from "../../core/util.js";
-import { openSheet, closeSheet, sheetOptions, sheetCurrent, sheetAction, sheetActions, sheetNote, AUTOMATIC } from "../../core/sheet.js";
+import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
 import { setComputing } from "../../core/computing.js";
 import { setAmbient } from "../../core/ambient.js";
@@ -18,6 +18,10 @@ const TICK_MS = 10 * 1000;
 const SOON_MIN = 20;
 const URGENT_MIN = 10;
 const PULSE_MIN = 5;
+// Au-delà d'une heure avant l'heure limite, le compteur affiche « plus d'1 h » et les horaires ne
+// sont plus rechargés automatiquement jusqu'à ce qu'il reste une heure. Le temps réel ne couvre de
+// toute façon qu'environ l'heure qui vient : avant, l'horaire prévu suffit.
+const LIVE_MIN = 60;
 
 // Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
 // une maison pour le domicile.
@@ -50,15 +54,27 @@ function mount({ root, network, adapter }) {
     pending: false,
     pendingVisible: false,
     lastComputedFrom: null,
-    pinnedOption: null, // clé de l'option choisie à la main (arrêt et correspondances), sinon automatique
     last: null, // dernier calcul : { result, origins, dests, now, partial }
     leaveBy: null, // heure limite affichée par le compte à rebours
     countdownHtml: null, // dernière valeur affichée, pour animer le passage d'une minute
     entered: false, // l'écran est apparu une fois : les rendus suivants ne rejouent pas l'apparition
+    asleep: false, // hors de la plage horaire du réseau : écran d'attente, aucun calcul
+    quietUntil: null, // heure limite à plus d'1 h : pas de rafraîchissement automatique avant cette heure
     unmounted: false,
   };
 
   const area = network.area;
+
+  // Dans la plage horaire du réseau (de serviceStartHour à serviceEndHour), ou toujours s'il n'en a pas.
+  const hours = (h) => `${h} h`;
+  const awake = () =>
+    adapter.serviceStartHour == null ||
+    adapter.serviceEndHour == null ||
+    inServiceWindow(Date.now(), {
+      timeZone: network.timeZone,
+      startHour: adapter.serviceStartHour,
+      endHour: adapter.serviceEndHour,
+    });
 
   // ---------- Écrans ----------
 
@@ -97,6 +113,20 @@ function mount({ root, network, adapter }) {
     );
   }
 
+  // Hors de la plage horaire : écran d'attente neutre. Domicile et position restent modifiables.
+  function showAsleep() {
+    state.last = null;
+    const start = hours(adapter.serviceStartHour);
+    renderScreen({
+      hero: heroText(
+        "En attente",
+        `Dès ${start}`,
+        `Le compte à rebours du dernier ${esc(adapter.vehicle)} fonctionne de ${start} à ${hours(adapter.serviceEndHour)}.`,
+      ),
+      meta: false,
+    });
+  }
+
   function openPositionSheet(reason = location.issue ?? "Indiquez l'adresse ou le lieu d'où vous partez.") {
     const known = location.address?.label;
     const body = openSheet(
@@ -112,7 +142,7 @@ function mount({ root, network, adapter }) {
       types: "StreetAddress,PositionOfInterest",
       onSelect(address) {
         closeSheet();
-        showMessage("Calcul du trajet…");
+        if (!state.asleep) showMessage("Calcul du trajet…");
         state.lastComputedFrom = null;
         location.setManual(address); // l'abonnement ci-dessous lance le calcul
       },
@@ -124,8 +154,11 @@ function mount({ root, network, adapter }) {
   function start() {
     if (!state.home) return showWaitingForHome();
     state.lastComputedFrom = null;
+    state.asleep = !awake();
     const here = location.here;
-    if (here) {
+    if (state.asleep) {
+      showAsleep();
+    } else if (here) {
       if (!covers(network, here)) showOutsideNetwork();
       else {
         showMessage("Calcul du trajet…");
@@ -144,6 +177,7 @@ function mount({ root, network, adapter }) {
     if (state.unmounted) return;
     if (type === "address") return paintPosition();
     if (!state.home) return;
+    if (state.asleep) return paintPosition();
     if (type === "issue") {
       if (!location.here) showLocationUnknown(issue);
       return;
@@ -159,12 +193,21 @@ function mount({ root, network, adapter }) {
   function scheduleRefresh() {
     clearInterval(state.timer);
     state.timer = setInterval(() => {
-      if (document.visibilityState === "visible") compute();
+      if (document.visibilityState === "visible" && !windowChanged() && !quiet()) compute();
     }, REFRESH_MS);
   }
 
   function onVisibility() {
-    if (document.visibilityState === "visible" && location.here) compute();
+    if (document.visibilityState === "visible" && !windowChanged() && !quiet() && location.here) compute();
+  }
+
+  const quiet = () => state.quietUntil != null && Date.now() < state.quietUntil;
+
+  // Début ou fin de la plage horaire : on repart de zéro (écran d'attente ou premier calcul).
+  function windowChanged() {
+    if (!state.home || awake() !== state.asleep) return false;
+    start();
+    return true;
   }
 
   // ---------- Calcul ----------
@@ -212,7 +255,7 @@ function mount({ root, network, adapter }) {
   // ou premier calcul. Les rafraîchissements automatiques restent silencieux.
   async function compute({ visible = false } = {}) {
     const here = location.here;
-    if (state.unmounted || !state.home || !here || !covers(network, here)) return;
+    if (state.unmounted || state.asleep || !state.home || !here || !covers(network, here)) return;
     if (state.busy) {
       state.pending = true;
       state.pendingVisible ||= visible;
@@ -283,20 +326,6 @@ function mount({ root, network, adapter }) {
       })
       .join("");
 
-  // Les options de la feuille Arrêt : de la plus proche à la plus lointaine, direct d'abord.
-  const optionsByWalk = (options) =>
-    [...options].sort((a, b) => a.origin.walk.meters - b.origin.walk.meters || a.transfers - b.transfers);
-
-  // L'option choisie à la main si elle ramène encore au domicile, sinon le choix automatique.
-  function chosenOption(result) {
-    const pinned = state.pinnedOption && result.options.find((o) => o.key === state.pinnedOption);
-    return pinned || result.primary || null;
-  }
-
-  const isPinned = (option) => option && option.key === state.pinnedOption;
-
-  const transfersLabel = (n) => (n === 0 ? "direct" : n === 1 ? "1 correspondance" : `${n} correspondances`);
-
   // Itinéraire du dernier trajet, à la manière d'un calculateur d'itinéraire : une colonne d'heures,
   // un tracé (pointillé à pied, plein à la couleur de la ligne en tram) et les étapes.
   function routeHtml(option) {
@@ -335,16 +364,11 @@ function mount({ root, network, adapter }) {
     ];
     legs.forEach((leg, i) => {
       const before = i === 0 ? "walk" : legs[i - 1].lineCode;
-      const note =
-        i === 0
-          ? isPinned(option)
-            ? `<span class="route-note">choisi par vous</span>`
-            : ""
-          : `<span class="route-note">correspondance</span>`;
-      // L'arrêt de départ se touche pour en choisir un autre (feuille Arrêt de départ).
+      const note = i === 0 ? "" : `<span class="route-note">correspondance</span>`;
+      // L'arrêt de départ se touche pour voir comment s'y rendre (feuille Arrêt de départ).
       const name =
         i === 0
-          ? `<button type="button" class="route-stop route-stop-button" data-action="open-station" aria-haspopup="dialog">${esc(leg.from.name)}<span class="visually-hidden">, changer d'arrêt</span></button>`
+          ? `<button type="button" class="route-stop route-stop-button" data-action="open-station" aria-haspopup="dialog">${esc(leg.from.name)}<span class="visually-hidden">, s'y rendre</span></button>`
           : `<strong class="route-stop">${esc(leg.from.name)}</strong>`;
       steps.push(
         step({
@@ -415,16 +439,7 @@ function mount({ root, network, adapter }) {
     setAmbient(tone, { pulsing });
   }
 
-  // Depuis le même arrêt, l'option qui laisse partir le plus tard, si c'est au moins 2 min plus tard
-  // (en général : avec une correspondance). Les autres arrêts restent dans la feuille Arrêt.
-  function laterFromSameStop(option, options) {
-    const best = options
-      .filter((o) => o !== option && o.origin.station.id === option.origin.station.id)
-      .reduce((b, o) => (!b || o.leaveBy > b.leaveBy ? o : b), null);
-    return best && best.leaveBy - option.leaveBy >= 2 * 60000 ? best : null;
-  }
-
-  function heroCountdown(option, later) {
+  function heroCountdown(option) {
     const last = option.last;
     return `
       <section class="hero glass tone-ok" id="hero">
@@ -440,13 +455,6 @@ function mount({ root, network, adapter }) {
         </div>
         <div class="hero-route">
           ${routeHtml(option)}
-          ${
-            later
-              ? `<button type="button" class="hero-later" data-action="pick-option" data-value="${esc(later.key)}">${
-                  later.transfers ? "Avec correspondance" : "En direct"
-                } : avant ${clock(later.leaveBy)}</button>`
-              : ""
-          }
         </div>
         ${PROGRESS}
       </section>`;
@@ -489,7 +497,11 @@ function mount({ root, network, adapter }) {
     // Heure limite dépassée de plus d'une minute : ce tram-là est perdu, en attendant le prochain calcul.
     const late = left < -60000;
     const minutes = Math.max(0, Math.floor(left / 60000));
-    const html = late ? `<span class="countdown-word">trop tard</span>` : countdownHtml(minutes);
+    const html = late
+      ? `<span class="countdown-word">trop tard</span>`
+      : left > LIVE_MIN * 60000
+        ? `<span class="countdown-word">plus d'1 h</span>`
+        : countdownHtml(minutes);
     el.innerHTML = html;
     // La valeur change (nouvelle minute) : les chiffres glissent en place.
     if (state.countdownHtml && state.countdownHtml !== html) {
@@ -514,6 +526,8 @@ function mount({ root, network, adapter }) {
     needPosition = false,
   }) {
     state.leaveBy = leaveBy;
+    // Rafraîchissements automatiques suspendus tant que l'heure limite est à plus d'une heure.
+    state.quietUntil = leaveBy != null ? leaveBy - LIVE_MIN * 60000 : null;
     // Ce qui manque pour calculer : d'abord le domicile, puis la position.
     const needs = !state.home ? "home" : needPosition ? "position" : null;
     const calloutText = {
@@ -574,13 +588,13 @@ function mount({ root, network, adapter }) {
 
   function renderLast() {
     const { result, now, partial } = state.last;
-    const option = chosenOption(result);
+    const option = result.primary ?? null;
     const night = network.nightHint ? ` ${network.nightHint}` : "";
 
     let hero;
     let leaveBy = null;
     if (option && !isEnded(option, now)) {
-      hero = heroCountdown(option, isPinned(option) ? null : laterFromSameStop(option, result.options));
+      hero = heroCountdown(option);
       leaveBy = option.leaveBy;
     } else if (option) {
       hero = heroText(
@@ -637,39 +651,20 @@ function mount({ root, network, adapter }) {
 
   // ---------- Feuilles de réglage ----------
 
+  // L'arrêt de départ n'est pas au choix : c'est celui du tracé qui laisse partir le plus tard.
+  // La feuille montre comment s'y rendre et permet de corriger la position.
   function openStationSheet() {
-    // Sans position, choisir un arrêt n'a pas de sens : on demande d'abord où vous êtes.
     if (state.home && !location.here) return openPositionSheet();
-    const now = Date.now();
-    const options = state.last ? optionsByWalk(state.last.result.options) : [];
-    const current = state.last ? chosenOption(state.last.result) : null;
-    const auto = !isPinned(current);
-    const primary = state.last?.result.primary;
-
-    const choices = [
-      {
-        action: "pick-option",
-        value: "",
-        main: AUTOMATIC,
-        detail: `L'arrêt qui vous ramène le plus tôt${primary ? `, ${esc(primary.origin.station.name)}` : ""}`,
-        pressed: auto,
-      },
-      ...options.map((o) => ({
-        action: "pick-option",
-        value: o.key,
-        main: `${badges(o.lineCodes)} ${esc(o.origin.station.name)}`,
-        detail: `${o.origin.walk.minutes} min à pied, ${transfersLabel(o.transfers)}, ${
-          isEnded(o, now) ? `premier tram à ${clock(o.next.dep)}` : `partez avant ${clock(o.leaveBy)}`
-        }`,
-        pressed: !auto && o === current,
-      })),
-    ];
+    const current = state.last?.result.primary ?? null;
 
     const body = openSheet(
       "Arrêt de départ",
       `${
-        options.length
-          ? sheetOptions(choices)
+        current
+          ? sheetCurrent(
+              "Le dernier tram possible part de",
+              `${current.origin.station.name}, ${current.origin.walk.minutes} min à pied`,
+            )
           : sheetNote(
               !state.home
                 ? "Indiquez d'abord votre domicile : l'arrêt dépend de l'endroit où vous rentrez."
@@ -689,11 +684,10 @@ function mount({ root, network, adapter }) {
         sheetAction({ icon: "pin", label: "Je ne suis pas ici", action: "manual-origin" }),
       )}`,
     );
-    body.querySelector('[aria-pressed="true"]')?.focus();
   }
 
   function openHomeSheet() {
-    const dest = state.last && chosenOption(state.last.result)?.dest;
+    const dest = state.last?.result.primary?.dest;
     const body = openSheet(
       "Adresse du domicile",
       `<div class="sheet-field"></div>
@@ -745,10 +739,6 @@ function mount({ root, network, adapter }) {
       openPositionSheet();
     } else if (action === "open-home") {
       openHomeSheet();
-    } else if (action === "pick-option") {
-      state.pinnedOption = target.dataset.value || null;
-      closeSheet();
-      if (state.last) renderLast();
     } else if (action === "refresh") {
       adapter.clearCache?.();
       if (location.here) compute({ visible: true });
