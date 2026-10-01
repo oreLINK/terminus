@@ -43,7 +43,9 @@ Ajoutez ou adaptez un test lorsque le comportement calculé change. Toute modifi
 npm run graph
 ```
 
-Relancez-le après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée** : le soir, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
+La même commande génère `js/networks/bordeaux-tbm/stops.js` : les lignes et arrêts de tram, que le site charge sans appeler l'API (`npm run graph -- --stops-only` ne régénère que lui).
+
+Relancez-la après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée et hors travaux** : le soir ou un jour de travaux, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
 
 ## Branches, contributions et GitHub
 

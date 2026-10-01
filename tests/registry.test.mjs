@@ -59,6 +59,29 @@ test("l'adaptateur du dernier tram fournit les fonctions attendues", () => {
   }
 });
 
+test("les arrêts du réseau se chargent sans appel à l'API et sont cohérents", async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = () => {
+    throw new Error("appel réseau inattendu");
+  };
+  try {
+    for (const n of NETWORKS) {
+      const a = n.features["last-ride"];
+      if (!a) continue;
+      const { lines, stops } = await a.loadStops();
+      assert.ok(Object.keys(lines).length > 0 && stops.length > 0, n.id);
+      for (const s of stops) {
+        assert.ok(s.ref && s.name && Number.isFinite(s.lat) && Number.isFinite(s.lon), `${n.id} : arrêt incomplet ${s.ref}`);
+        assert.ok(s.lines.length && s.lines.every((l) => lines[l]), `${n.id} : ligne inconnue à ${s.ref}`);
+      }
+      // Chaque ligne dessert au moins deux arrêts.
+      for (const ref of Object.keys(lines)) assert.ok(stops.filter((s) => s.lines.includes(ref)).length >= 2, `${n.id} ${ref}`);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
 test("le graphe du réseau, s'il existe, décrit des lignes de tram connues dans les deux sens", async () => {
   for (const n of NETWORKS) {
     const a = n.features["last-ride"];

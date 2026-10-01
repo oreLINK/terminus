@@ -23,6 +23,10 @@ const PULSE_MIN = 5;
 // sont plus rechargés automatiquement jusqu'à ce qu'il reste une heure. Le temps réel ne couvre de
 // toute façon qu'environ l'heure qui vient : avant, l'horaire prévu suffit.
 const LIVE_MIN = 60;
+// Âge maximal des horaires en cache : court pour les lignes du tracé affiché (temps réel), long pour
+// les autres, qui ne servent qu'à vérifier qu'aucun tracé ne laisse partir plus tard.
+const ROUTE_MAX_AGE_MS = 100 * 1000;
+const OTHER_MAX_AGE_MS = 15 * 60 * 1000;
 
 // Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
 // une maison pour le domicile.
@@ -61,6 +65,7 @@ function mount({ root, network, adapter }) {
     entered: false, // l'écran est apparu une fois : les rendus suivants ne rejouent pas l'apparition
     asleep: false, // hors de la plage horaire du réseau : écran d'attente, aucun calcul
     quietUntil: null, // heure limite à plus d'1 h : pas de rafraîchissement automatique avant cette heure
+    routeLines: new Set(), // lignes du tracé affiché : leurs horaires sont rechargés plus souvent
     unmounted: false,
   };
 
@@ -246,10 +251,13 @@ function mount({ root, network, adapter }) {
     return [routeRequests(args), routeRequests({ ...args, extraTransfers: 1 }), all];
   }
 
-  // Les courses des (ligne, sens) demandés. Un échec partiel est signalé
+  // Les courses des (ligne, sens) demandés, jusqu'à la fin du service. Un échec partiel est signalé
   // sans bloquer ; si rien ne répond, l'erreur remonte.
-  async function loadJourneys(requests) {
-    const settled = await Promise.allSettled(requests.map((r) => adapter.loadTimetable(r.line, r.direction)));
+  async function loadJourneys(requests, until) {
+    const maxAge = (r) => (state.routeLines.has(r.line) ? ROUTE_MAX_AGE_MS : OTHER_MAX_AGE_MS);
+    const settled = await Promise.allSettled(
+      requests.map((r) => adapter.loadTimetable(r.line, r.direction, { until, maxAge: maxAge(r) })),
+    );
     const failed = settled.filter((r) => r.status === "rejected");
     if (settled.length && failed.length === settled.length) throw failed[0].reason;
     return { journeys: settled.filter((r) => r.status === "fulfilled").flatMap((r) => r.value), failed: failed.length };
@@ -285,20 +293,26 @@ function mount({ root, network, adapter }) {
       let failed = 0;
       let result = null;
       let now = clockNow();
-      for (const stage of loadStages(origins, dests)) {
+      const serviceEnd =
+        endHour == null ? Infinity : serviceEndAfter(now, { timeZone: network.timeZone, hour: endHour });
+      const stages = loadStages(origins, dests);
+      for (const stage of stages) {
         const todo = stage.filter((r) => !loaded.has(`${r.line}|${r.direction}`));
         if (result && !todo.length) continue;
         for (const r of todo) loaded.add(`${r.line}|${r.direction}`);
-        const got = await loadJourneys(todo);
+        const got = await loadJourneys(todo, serviceEnd);
         if (state.unmounted) return;
         journeys = journeys.concat(got.journeys);
         failed += got.failed;
         now = clockNow();
-        const serviceEnd =
-          endHour == null ? Infinity : serviceEndAfter(now, { timeZone: network.timeZone, hour: endHour });
         result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd });
         if (result.options.length) break;
       }
+      // Les horaires ne couvrent que jusqu'à la fin du service : l'API ne renvoie alors presque plus
+      // les courses passées, et « le dernier tram est parti » ne se voit plus dans les données.
+      // Si le graphe relie les deux côtés et qu'il ne reste aucun tram, c'est que le dernier est parti.
+      if (result?.status === "none" && state.graph && stages[0].length) result = { ...result, status: "over" };
+      state.routeLines = new Set(result?.primary?.last.legs.map((l) => l.line) ?? []);
 
       state.lastComputedFrom = here;
       state.last = { result, origins, dests, now, partial: failed > 0 };
