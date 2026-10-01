@@ -40,6 +40,9 @@ export default {
       vehicle: "tram",
       // Le dernier tram est celui de la soirée : dernier départ avant 3 h du matin (heure locale).
       serviceEndHour: 3,
+      // Le compte à rebours ne tourne qu'en soirée, de 18 h jusqu'à la fin du service ; un écran
+      // d'attente s'affiche le reste du temps, sans appel à l'API.
+      serviceStartHour: 18,
       loadStops: loadNetwork, // → { lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }
       loadTimetable, // (lineRef, direction) → [{ id, line, headsign, calls: [...] }]
       // Ordre des arrêts par ligne et par sens, généré par tools/build-graph.mjs, chargé à la demande.

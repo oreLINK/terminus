@@ -89,8 +89,6 @@ export const TRANSFER_MS = 2 * MIN;
 // Marge ajoutée à la marche jusqu'à l'arrêt de départ : on part 2 min plus tôt que le strict nécessaire.
 export const WALK_MARGIN_MS = 2 * MIN;
 export const MAX_TRANSFERS = 2;
-// Dans le choix automatique, une correspondance « coûte » autant que 10 min de trajet en plus.
-export const TRANSFER_PENALTY_MS = 10 * MIN;
 
 // Horaires à charger d'après le graphe du réseau (ordre des arrêts par ligne et par sens), avant
 // tout appel : [{ line, direction }]. Garde les motifs utiles à un trajet d'au plus `extraTransfers`
@@ -154,7 +152,9 @@ function legsFrom(seqs, sources, maxLegs, reverse) {
 // Les listes sont triées par départ et ne gardent que les départs utiles : un départ plus tard
 // qui arrive au plus tard aussi tôt rend le précédent inutile. Le premier départ à partir d'une
 // heure donnée est donc aussi celui qui arrive le plus tôt.
-function buildProfiles({ journeys, index, destById, maxTransfers }) {
+// Aucune montée à partir de `serviceEnd` : chaque tronçon, correspondances comprises, reste dans
+// la même journée de service (jamais un tram du lendemain matin pour finir le trajet).
+function buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd }) {
   const runs = journeys.map((j) => ({ j, stations: j.calls.map((c) => index.stationFor(c)) }));
   const profiles = [];
 
@@ -170,7 +170,7 @@ function buildProfiles({ journeys, index, destById, maxTransfers }) {
         const st = stations[i];
         if (!st || call.cancelled) continue;
 
-        if (best && best.station.id !== st.id) {
+        if (best && best.station.id !== st.id && call.dep < serviceEnd) {
           if (!byStation.has(st.id)) byStation.set(st.id, []);
           byStation.get(st.id).push({
             dep: call.dep,
@@ -268,6 +268,12 @@ export function serviceEndAfter(now, { timeZone, hour }) {
   return end - offset;
 }
 
+// Plage horaire où le compte à rebours fonctionne (de 18 h à 3 h à Bordeaux), qui peut passer
+// minuit. On y est quand sa fin arrive avant son prochain début.
+export function inServiceWindow(now, { timeZone, startHour, endHour }) {
+  return serviceEndAfter(now, { timeZone, hour: endHour }) < serviceEndAfter(now, { timeZone, hour: startHour });
+}
+
 // Trajet complet à partir d'un départ du profil. Les champs du premier tronçon restent à la
 // racine (dep, lineCode…) : c'est le tram à prendre depuis l'arrêt de départ.
 function itinerary(entry, lineCodes) {
@@ -294,10 +300,10 @@ function itinerary(entry, lineCodes) {
 // Une option par couple (station de départ, nombre de correspondances), toutes lignes confondues.
 // Les courses partielles (qui s'arrêtent avant la station d'arrivée) ne servent que si une
 // correspondance permet de finir le trajet.
-// `serviceEnd` : fin du service en cours (serviceEndAfter) ; les départs après elle sont ignorés.
+// `serviceEnd` : fin du service en cours (serviceEndAfter) ; aucun tronçon ne part après elle.
 export function plan({ origins, dests, journeys, index, lineCodes, now, serviceEnd = Infinity, maxTransfers = MAX_TRANSFERS }) {
   const destById = new Map(dests.map((d) => [d.station.id, d]));
-  const profiles = buildProfiles({ journeys, index, destById, maxTransfers });
+  const profiles = buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd });
 
   const found = [];
   let upcoming = false; // des trams restent, rejoignables ou non
@@ -307,7 +313,7 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
     const walkToMs = origin.walk.minutes * MIN + WALK_MARGIN_MS;
     profiles.forEach((profile, transfers) => {
       const entries = profile.get(origin.station.id) ?? [];
-      const future = entries.filter((e) => e.dep >= now - MIN && e.dep < serviceEnd);
+      const future = entries.filter((e) => e.dep >= now - MIN);
       if (entries.some((e) => e.dep < now - MIN)) servedEarlier = true;
       if (future.length) upcoming = true;
       const catchable = future.filter((e) => e.dep >= now + walkToMs).map((e) => itinerary(e, lineCodes));
@@ -341,9 +347,14 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
       ),
   );
 
-  const rank = (o) => o.arriveHome + o.transfers * TRANSFER_PENALTY_MS;
+  // Un seul tracé recommandé : celui qui laisse partir le plus tard, c'est-à-dire le dernier tram
+  // possible sur tout le trajet. À égalité : moins de correspondances, moins de marche, arrivée plus tôt.
   options.sort(
-    (a, b) => rank(a) - rank(b) || a.origin.walk.meters - b.origin.walk.meters || a.transfers - b.transfers,
+    (a, b) =>
+      b.leaveBy - a.leaveBy ||
+      a.transfers - b.transfers ||
+      a.origin.walk.meters - b.origin.walk.meters ||
+      a.arriveHome - b.arriveHome,
   );
 
   // missed : des trams restent, mais aucun n'est rejoignable à pied à temps.
@@ -355,22 +366,5 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
   // La journée commerciale a basculé : le prochain départ est demain matin.
   if (primary.next.dep - now > SERVICE_GAP_MS) return { status: "ended", options, primary };
 
-  // À égalité d'heure limite, la première option du classement (souvent moins de correspondances).
-  const latest = options.reduce((best, o) => (o.leaveBy > best.leaveBy ? o : best), primary);
-  const alternatives = [];
-  const seenOrigins = new Set([primary.origin.station.id]);
-  for (const o of options) {
-    if (seenOrigins.has(o.origin.station.id)) continue;
-    seenOrigins.add(o.origin.station.id);
-    alternatives.push(o);
-    if (alternatives.length === 3) break;
-  }
-
-  return {
-    status: "ok",
-    options,
-    primary,
-    alternatives,
-    later: latest !== primary && latest.leaveBy - primary.leaveBy >= 2 * MIN ? latest : null,
-  };
+  return { status: "ok", options, primary };
 }
