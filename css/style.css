@@ -760,25 +760,6 @@ main {
   text-wrap: balance;
 }
 
-/* Depuis le même arrêt, une option laisse partir plus tard : une pastille touchable. */
-.hero-later {
-  min-height: 2.75rem;
-  padding: 0.375rem 1rem;
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--ink);
-  background: color-mix(in srgb, var(--tone) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--tone) 30%, transparent);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.2s ease;
-}
-
-.hero-later:active {
-  transform: scale(0.97);
-}
-
 /* Calcul en cours : les chiffres s'estompent à peine et un segment glisse sur une ligne,
    comme un tram. Sans animation si le mouvement est réduit : la ligne reste, pleine. */
 .progress {

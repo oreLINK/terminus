@@ -197,15 +197,24 @@ test("correspondance : il faut le temps de changer de quai", () => {
   assert.equal(run([southbound("b1", min(30)), eastbound("a1", min(36))], NOW, nord).status, "ok");
 });
 
-test("le direct passe en premier, la correspondance qui part plus tard est signalée", () => {
+test("un seul tracé : celui qui laisse partir le plus tard, même avec une correspondance", () => {
   // Direct : dernier A complet à +20. Plus tard : A partiel jusqu'à Pont, puis renfort Pont → Est.
   const journeys = [eastbound("full", min(20)), eastbound("partial", min(50), { toEnd: false }), fromPont("p1", min(60))];
   const r = run(journeys);
+  assert.equal(r.primary.transfers, 1);
+  assert.deepEqual(r.primary.last.legs.map((l) => l.journeyId), ["partial", "p1"]);
+  assert.equal(r.primary.last.legs[1].from.name, "Pont");
+  assert.equal(r.later, undefined);
+  assert.equal(r.alternatives, undefined);
+});
+
+test("à heure limite égale, le tracé avec le moins de correspondances", () => {
+  // Même A au départ de Centre : direct jusqu'à Est, ou descente à Pont pour un renfort plus tardif
+  // qui n'arrive pas avant. Le direct suffit.
+  const journeys = [eastbound("full", min(20)), fromPont("p1", min(40))];
+  const r = run(journeys);
+  assert.equal(r.primary.origin.station.name, "Centre");
   assert.equal(r.primary.transfers, 0);
-  assert.equal(r.primary.last.journeyId, "full");
-  assert.equal(r.later.transfers, 1);
-  assert.deepEqual(r.later.last.legs.map((l) => l.journeyId), ["partial", "p1"]);
-  assert.equal(r.later.last.legs[1].from.name, "Pont");
 });
 
 test("le dernier direct manqué, la correspondance prend le relais", () => {
@@ -216,9 +225,20 @@ test("le dernier direct manqué, la correspondance prend le relais", () => {
   const fromCentre = r.options.filter((o) => o.origin.station.name === "Centre");
   assert.deepEqual(fromCentre.map((o) => o.transfers), [1]);
   assert.equal(fromCentre[0].last.journeyId, "partial");
-  // Pont est aussi à portée de marche : y aller à pied pour le renfort direct compte moins qu'une correspondance.
-  assert.equal(r.primary.origin.station.name, "Pont");
-  assert.equal(r.primary.transfers, 0);
+  // Pont est aussi à portée de marche, mais le A partiel depuis Centre laisse partir plus tard.
+  assert.equal(r.primary.origin.station.name, "Centre");
+  assert.equal(r.primary.transfers, 1);
+});
+
+test("une correspondance ne se prend jamais après la fin du service (tram du lendemain matin)", () => {
+  // 23 h à Paris, fin du service à 3 h (+240). Le dernier B arrive à Centre à +238 ; le A suivant
+  // part à 4 h 30 (+330), le lendemain : pas de trajet ce soir.
+  const r = run([southbound("b1", min(230)), eastbound("a-matin", min(326))], NOW, nord);
+  assert.equal(r.options.length, 0);
+  assert.notEqual(r.status, "ok");
+  // Le même B avec un A encore dans la soirée : trajet possible.
+  const ok = run([southbound("b1", min(200)), eastbound("a-soir", min(206))], NOW, nord);
+  assert.deepEqual(ok.primary.last.legs.map((l) => l.journeyId), ["b1", "a-soir"]);
 });
 
 // Graphe fictif du même réseau : ordre des quais par ligne et par sens.

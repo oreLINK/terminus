@@ -4,7 +4,7 @@
 import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc } from "../../core/util.js";
-import { openSheet, closeSheet, sheetOptions, sheetCurrent, sheetAction, sheetActions, sheetNote, AUTOMATIC } from "../../core/sheet.js";
+import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
 import { setComputing } from "../../core/computing.js";
 import { setAmbient } from "../../core/ambient.js";
@@ -54,7 +54,6 @@ function mount({ root, network, adapter }) {
     pending: false,
     pendingVisible: false,
     lastComputedFrom: null,
-    pinnedOption: null, // clé de l'option choisie à la main (arrêt et correspondances), sinon automatique
     last: null, // dernier calcul : { result, origins, dests, now, partial }
     leaveBy: null, // heure limite affichée par le compte à rebours
     countdownHtml: null, // dernière valeur affichée, pour animer le passage d'une minute
@@ -327,20 +326,6 @@ function mount({ root, network, adapter }) {
       })
       .join("");
 
-  // Les options de la feuille Arrêt : de la plus proche à la plus lointaine, direct d'abord.
-  const optionsByWalk = (options) =>
-    [...options].sort((a, b) => a.origin.walk.meters - b.origin.walk.meters || a.transfers - b.transfers);
-
-  // L'option choisie à la main si elle ramène encore au domicile, sinon le choix automatique.
-  function chosenOption(result) {
-    const pinned = state.pinnedOption && result.options.find((o) => o.key === state.pinnedOption);
-    return pinned || result.primary || null;
-  }
-
-  const isPinned = (option) => option && option.key === state.pinnedOption;
-
-  const transfersLabel = (n) => (n === 0 ? "direct" : n === 1 ? "1 correspondance" : `${n} correspondances`);
-
   // Itinéraire du dernier trajet, à la manière d'un calculateur d'itinéraire : une colonne d'heures,
   // un tracé (pointillé à pied, plein à la couleur de la ligne en tram) et les étapes.
   function routeHtml(option) {
@@ -379,16 +364,11 @@ function mount({ root, network, adapter }) {
     ];
     legs.forEach((leg, i) => {
       const before = i === 0 ? "walk" : legs[i - 1].lineCode;
-      const note =
-        i === 0
-          ? isPinned(option)
-            ? `<span class="route-note">choisi par vous</span>`
-            : ""
-          : `<span class="route-note">correspondance</span>`;
-      // L'arrêt de départ se touche pour en choisir un autre (feuille Arrêt de départ).
+      const note = i === 0 ? "" : `<span class="route-note">correspondance</span>`;
+      // L'arrêt de départ se touche pour voir comment s'y rendre (feuille Arrêt de départ).
       const name =
         i === 0
-          ? `<button type="button" class="route-stop route-stop-button" data-action="open-station" aria-haspopup="dialog">${esc(leg.from.name)}<span class="visually-hidden">, changer d'arrêt</span></button>`
+          ? `<button type="button" class="route-stop route-stop-button" data-action="open-station" aria-haspopup="dialog">${esc(leg.from.name)}<span class="visually-hidden">, s'y rendre</span></button>`
           : `<strong class="route-stop">${esc(leg.from.name)}</strong>`;
       steps.push(
         step({
@@ -459,16 +439,7 @@ function mount({ root, network, adapter }) {
     setAmbient(tone, { pulsing });
   }
 
-  // Depuis le même arrêt, l'option qui laisse partir le plus tard, si c'est au moins 2 min plus tard
-  // (en général : avec une correspondance). Les autres arrêts restent dans la feuille Arrêt.
-  function laterFromSameStop(option, options) {
-    const best = options
-      .filter((o) => o !== option && o.origin.station.id === option.origin.station.id)
-      .reduce((b, o) => (!b || o.leaveBy > b.leaveBy ? o : b), null);
-    return best && best.leaveBy - option.leaveBy >= 2 * 60000 ? best : null;
-  }
-
-  function heroCountdown(option, later) {
+  function heroCountdown(option) {
     const last = option.last;
     return `
       <section class="hero glass tone-ok" id="hero">
@@ -484,13 +455,6 @@ function mount({ root, network, adapter }) {
         </div>
         <div class="hero-route">
           ${routeHtml(option)}
-          ${
-            later
-              ? `<button type="button" class="hero-later" data-action="pick-option" data-value="${esc(later.key)}">${
-                  later.transfers ? "Avec correspondance" : "En direct"
-                } : avant ${clock(later.leaveBy)}</button>`
-              : ""
-          }
         </div>
         ${PROGRESS}
       </section>`;
@@ -624,13 +588,13 @@ function mount({ root, network, adapter }) {
 
   function renderLast() {
     const { result, now, partial } = state.last;
-    const option = chosenOption(result);
+    const option = result.primary ?? null;
     const night = network.nightHint ? ` ${network.nightHint}` : "";
 
     let hero;
     let leaveBy = null;
     if (option && !isEnded(option, now)) {
-      hero = heroCountdown(option, isPinned(option) ? null : laterFromSameStop(option, result.options));
+      hero = heroCountdown(option);
       leaveBy = option.leaveBy;
     } else if (option) {
       hero = heroText(
@@ -687,39 +651,20 @@ function mount({ root, network, adapter }) {
 
   // ---------- Feuilles de réglage ----------
 
+  // L'arrêt de départ n'est pas au choix : c'est celui du tracé qui laisse partir le plus tard.
+  // La feuille montre comment s'y rendre et permet de corriger la position.
   function openStationSheet() {
-    // Sans position, choisir un arrêt n'a pas de sens : on demande d'abord où vous êtes.
     if (state.home && !location.here) return openPositionSheet();
-    const now = Date.now();
-    const options = state.last ? optionsByWalk(state.last.result.options) : [];
-    const current = state.last ? chosenOption(state.last.result) : null;
-    const auto = !isPinned(current);
-    const primary = state.last?.result.primary;
-
-    const choices = [
-      {
-        action: "pick-option",
-        value: "",
-        main: AUTOMATIC,
-        detail: `L'arrêt qui vous ramène le plus tôt${primary ? `, ${esc(primary.origin.station.name)}` : ""}`,
-        pressed: auto,
-      },
-      ...options.map((o) => ({
-        action: "pick-option",
-        value: o.key,
-        main: `${badges(o.lineCodes)} ${esc(o.origin.station.name)}`,
-        detail: `${o.origin.walk.minutes} min à pied, ${transfersLabel(o.transfers)}, ${
-          isEnded(o, now) ? `premier tram à ${clock(o.next.dep)}` : `partez avant ${clock(o.leaveBy)}`
-        }`,
-        pressed: !auto && o === current,
-      })),
-    ];
+    const current = state.last?.result.primary ?? null;
 
     const body = openSheet(
       "Arrêt de départ",
       `${
-        options.length
-          ? sheetOptions(choices)
+        current
+          ? sheetCurrent(
+              "Le dernier tram possible part de",
+              `${current.origin.station.name}, ${current.origin.walk.minutes} min à pied`,
+            )
           : sheetNote(
               !state.home
                 ? "Indiquez d'abord votre domicile : l'arrêt dépend de l'endroit où vous rentrez."
@@ -739,11 +684,10 @@ function mount({ root, network, adapter }) {
         sheetAction({ icon: "pin", label: "Je ne suis pas ici", action: "manual-origin" }),
       )}`,
     );
-    body.querySelector('[aria-pressed="true"]')?.focus();
   }
 
   function openHomeSheet() {
-    const dest = state.last && chosenOption(state.last.result)?.dest;
+    const dest = state.last?.result.primary?.dest;
     const body = openSheet(
       "Adresse du domicile",
       `<div class="sheet-field"></div>
@@ -795,10 +739,6 @@ function mount({ root, network, adapter }) {
       openPositionSheet();
     } else if (action === "open-home") {
       openHomeSheet();
-    } else if (action === "pick-option") {
-      state.pinnedOption = target.dataset.value || null;
-      closeSheet();
-      if (state.last) renderLast();
     } else if (action === "refresh") {
       adapter.clearCache?.();
       if (location.here) compute({ visible: true });
