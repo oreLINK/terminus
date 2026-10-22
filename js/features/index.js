@@ -7,8 +7,9 @@
 //   mount({ root, network, adapter }) → { unmount() }
 
 import lastRide from "./last-ride/index.js";
+import nightRide from "./night-ride/index.js";
 
-export const FEATURES = [lastRide];
+export const FEATURES = [lastRide, nightRide];
 
 // Choix du mode automatique.
 export const DEFAULT_FEATURE = "last-ride";

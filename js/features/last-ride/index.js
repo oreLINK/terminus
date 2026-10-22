@@ -1,7 +1,7 @@
 // Type d'information « Le dernier tram pour rentrer » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, serviceMorning, addDays, communeOf, zoneDests, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc } from "../../core/util.js";
 import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
@@ -48,7 +48,9 @@ export default {
   mount,
 };
 
-function mount({ root, network, adapter }) {
+// Monté aussi par d'autres types d'information (night-ride : TBNight) : tout ce qui dépend du
+// véhicule vient de l'adaptateur (vehicle, plage horaire, nuits de service, zones à la demande).
+export function mount({ root, network, adapter }) {
   const state = {
     home: getHome(network),
     index: null,
@@ -75,13 +77,20 @@ function mount({ root, network, adapter }) {
   const startHour = lab?.startHour ?? adapter.serviceStartHour;
   const endHour = lab?.endHour ?? adapter.serviceEndHour;
   const liveMs = (lab?.liveMin ?? LIVE_MIN) * 60000;
+  const V = adapter.vehicle; // « tram », « bus de nuit »
+
+  // Nuits de service (TBNight : jeudi, vendredi, samedi et veilles de fêtes), jugées sur le matin de
+  // la nuit en cours. Sans `runsOn`, le véhicule circule tous les jours.
+  const morning = () => serviceMorning(clockNow(), { timeZone: network.timeZone, hour: endHour ?? 0 });
+  const runsTonight = () => !adapter.runsOn || adapter.runsOn(morning());
 
   // Dans la plage horaire du réseau (de serviceStartHour à serviceEndHour), ou toujours s'il n'en a pas.
   const hours = (h) => `${h} h`;
   const awake = () =>
-    startHour == null ||
-    endHour == null ||
-    inServiceWindow(clockNow(), { timeZone: network.timeZone, startHour, endHour });
+    runsTonight() &&
+    (startHour == null ||
+      endHour == null ||
+      inServiceWindow(clockNow(), { timeZone: network.timeZone, startHour, endHour }));
 
   // ---------- Écrans ----------
 
@@ -120,9 +129,29 @@ function mount({ root, network, adapter }) {
     );
   }
 
-  // Hors de la plage horaire : écran d'attente neutre. Domicile et position restent modifiables.
+  // Hors de la plage horaire, ou nuit sans service : écran d'attente neutre. Domicile et position
+  // restent modifiables.
   function showAsleep() {
     state.last = null;
+    if (!runsTonight()) {
+      let m = morning();
+      for (let i = 0; i < 14 && !adapter.runsOn(m); i++) m = addDays(m, 1);
+      const evening = addDays(m, -1);
+      const date = new Date(Date.UTC(evening.year, evening.month - 1, evening.day)).toLocaleDateString("fr-FR", {
+        timeZone: "UTC",
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      });
+      return renderScreen({
+        hero: heroText(
+          "Pas de service cette nuit",
+          `Dès ${date}`,
+          `${esc(adapter.serviceName ?? V)} circule ${esc(adapter.nights ?? "")}, de ${hours(startHour)} à ${hours(endHour)} sur Terminus.`,
+        ),
+        meta: false,
+      });
+    }
     const start = hours(startHour);
     renderScreen({
       hero: heroText(
@@ -287,7 +316,17 @@ function mount({ root, network, adapter }) {
       }
 
       const origins = nearestStations(state.index.stations, here, { radius: 2000, min: 2, max: 8 });
-      const dests = nearestStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 5 });
+      // Zones à la demande (TBNight) : si le domicile est dans une commune de zone, le dernier arrêt
+      // fixe de la ligne y mène sans marche (on reste dans le bus), même s'il est aussi à portée à pied.
+      const zones = zoneDests({
+        zones: adapter.zones,
+        commune: communeOf(state.home.label),
+        graph: state.graph,
+        index: state.index,
+        lineCodes: state.lineCodes,
+      });
+      const near = nearestStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 5 });
+      const dests = [...near.filter((d) => !zones.some((z) => z.station.id === d.station.id)), ...zones];
       const loaded = new Set();
       let journeys = [];
       let failed = 0;
@@ -366,6 +405,7 @@ function mount({ root, network, adapter }) {
       </li>`;
     const walkTo = walkLink(location.here, option.origin.station);
     const walkHome = walkLink(trip.dest.station, state.home);
+    const zone = trip.dest.zone;
     const minutes = (a, b) => Math.max(1, Math.round((b - a) / 60000));
 
     const steps = [
@@ -412,11 +452,31 @@ function mount({ root, network, adapter }) {
       step({
         time: clock(final.arr),
         top: final.lineCode,
-        bottom: "walk",
+        bottom: zone ? final.lineCode : "walk",
         dot: "is-stop",
         dotLine: final.lineCode,
-        body: `<strong class="route-stop">${esc(final.to.name)}</strong>`,
+        body: `<strong class="route-stop">${esc(final.to.name)}</strong>${
+          zone ? ` <span class="route-note">dernier arrêt fixe</span>` : ""
+        }`,
       }),
+    );
+    // Zone à la demande : on reste dans le bus, l'arrêt se réserve avant de monter. Pas d'heure
+    // d'arrivée : elle dépend des réservations.
+    if (zone) {
+      steps.push(
+        step({
+          top: final.lineCode,
+          dot: "is-end",
+          kind: "home",
+          body: `Zone à la demande, ${esc(zone.commune)} : réservez votre arrêt dans l'app TBM avant de monter`,
+          action: adapter.zoneInfoUrl
+            ? `<a class="route-go" href="${esc(adapter.zoneInfoUrl)}" target="_blank" rel="noopener" aria-label="Réserver un arrêt en zone à la demande (site TBM)">${ICONS.go}</a>`
+            : "",
+        }),
+      );
+      return `<ol class="route" aria-label="Itinéraire du dernier trajet">${steps.join("")}</ol>`;
+    }
+    steps.push(
       step({
         time: clock(trip.arrHome),
         top: "walk",
@@ -527,7 +587,7 @@ function mount({ root, network, adapter }) {
       el.classList.add("is-ticking");
     }
     state.countdownHtml = html;
-    root.querySelector("#hero-label").textContent = late ? "Pour ce tram, c'est" : minutes < 1 ? "Partez" : "Partez dans";
+    root.querySelector("#hero-label").textContent = late ? `Pour ce ${V}, c'est` : minutes < 1 ? "Partez" : "Partez dans";
     const hero = root.querySelector("#hero");
     const pulsing = !late && minutes < PULSE_MIN;
     setTone(hero, late ? "late" : minutes < URGENT_MIN ? "urgent" : minutes < SOON_MIN ? "soon" : "ok", pulsing);
@@ -614,21 +674,21 @@ function mount({ root, network, adapter }) {
 
   // Pas de compte à rebours : service terminé, dernier tram manqué ou parti, aucun trajet.
   function endHero(status, option) {
-    const night = network.nightHint ? ` ${network.nightHint}` : "";
+    const night = adapter.nightHint ? ` ${adapter.nightHint}` : "";
     if (option) {
       return heroText(
         "Service terminé",
-        "Plus de tram ce soir",
-        `Premier tram ${badges([option.next.lineCode])} vers chez vous à ${clock(option.next.dep)}.`,
+        `Plus de ${V} ce soir`,
+        `Premier ${V} ${badges([option.next.lineCode])} vers chez vous à ${clock(option.next.dep)}.`,
         "",
         "late",
       );
     }
     if (status === "missed") {
       return heroText(
-        "Dernier tram manqué",
+        `Dernier ${V} manqué`,
         "Trop tard à pied",
-        `Le dernier tram vers chez vous part avant que vous puissiez rejoindre l'arrêt.${esc(night)}`,
+        `Le dernier ${V} vers chez vous part avant que vous puissiez rejoindre l'arrêt.${esc(night)}`,
         "",
         "late",
       );
@@ -636,16 +696,16 @@ function mount({ root, network, adapter }) {
     if (status === "over") {
       return heroText(
         "Service terminé",
-        "Plus de tram ce soir",
-        `Le dernier tram vers chez vous est parti.${esc(night)}`,
+        `Plus de ${V} ce soir`,
+        `Le dernier ${V} vers chez vous est parti.${esc(night)}`,
         "",
         "late",
       );
     }
     return heroText(
-      "Aucun tram",
-      "Plus de tram d'ici",
-      `Aucun tram ne relie les arrêts proches de vous à chez vous d'ici la fin du service, même avec correspondance.${esc(night)}`,
+      `Aucun ${V}`,
+      `Plus de ${V} d'ici`,
+      `Aucun ${V} ne relie les arrêts proches de vous à chez vous d'ici la fin du service, même avec correspondance.${esc(night)}`,
     );
   }
 
@@ -689,14 +749,14 @@ function mount({ root, network, adapter }) {
       `${
         current
           ? sheetCurrent(
-              "Le dernier tram possible part de",
+              `Le dernier ${V} possible part de`,
               `${current.origin.station.name}, ${current.origin.walk.minutes} min à pied`,
             )
           : sheetNote(
               !state.home
                 ? "Indiquez d'abord votre domicile : l'arrêt dépend de l'endroit où vous rentrez."
                 : state.last
-                  ? "Aucun arrêt proche n'a de tram vers chez vous, même avec correspondance."
+                  ? `Aucun arrêt proche n'a de ${V} vers chez vous, même avec correspondance.`
                   : "Recherche des arrêts autour de vous…",
             )
       }
@@ -722,7 +782,7 @@ function mount({ root, network, adapter }) {
         state.home
           ? sheetCurrent("Actuellement", state.home.label)
           : sheetNote(
-              "Terminus cherche le tram qui vous ramène au plus près de chez vous. Votre adresse reste enregistrée dans ce navigateur uniquement.",
+              `Terminus cherche le ${V} qui vous ramène au plus près de chez vous. Votre adresse reste enregistrée dans ce navigateur uniquement.`,
             )
       }
       ${

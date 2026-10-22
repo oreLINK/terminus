@@ -268,6 +268,65 @@ export function serviceEndAfter(now, { timeZone, hour }) {
   return end - offset;
 }
 
+// Date locale d'un instant dans le fuseau du réseau : { year, month, day, weekday } (0 = dimanche).
+export function localDate(ms, timeZone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(ms)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  return addDays(parts, 0);
+}
+
+export function addDays({ year, month, day }, n) {
+  const d = new Date(Date.UTC(year, month - 1, day + n));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), weekday: d.getUTCDay() };
+}
+
+// Matin de la nuit de service en cours : la date locale de sa fin. La nuit du jeudi au vendredi
+// a pour matin le vendredi, à 18 h le jeudi comme à 4 h le vendredi.
+export const serviceMorning = (now, { timeZone, hour }) => localDate(serviceEndAfter(now, { timeZone, hour }), timeZone);
+
+// Commune d'une adresse de la Géoplateforme (« 12 Rue X 33700 Mérignac » → « merignac »), normalisée
+// pour la comparer à une liste : minuscules, sans accents ni tirets, « St » écrit « saint ».
+export const normCommune = (name) =>
+  name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[-'’]/g, " ")
+    .replace(/\bst\b/g, "saint")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export function communeOf(label) {
+  const m = /\b\d{5}\s+(.+)$/.exec(label ?? "");
+  return m ? normCommune(m[1]) : null;
+}
+
+// Zones à la demande (TBNight) : au-delà de son dernier arrêt fixe, une ligne dessert les arrêts
+// réservés dans certaines communes. Si le domicile est dans l'une d'elles, le dernier arrêt fixe de
+// la ligne devient une arrivée possible, sans marche : on reste dans le bus. L'heure d'arrivée est
+// celle du dernier arrêt fixe (la suite dépend des réservations).
+// zones : [{ line: code, communes: [nom] }] ; renvoie des arrivées au format de nearestStations.
+export function zoneDests({ zones, commune, graph, index, lineCodes }) {
+  if (!zones?.length || !commune || !graph) return [];
+  const out = [];
+  for (const zone of zones) {
+    const match = zone.communes.find((c) => normCommune(c) === commune);
+    if (!match) continue;
+    for (const p of graph.patterns) {
+      if (lineCodes[p.line] !== zone.line) continue;
+      const last = p.stops[p.stops.length - 1];
+      const station = index.stationFor({ ref: last, name: graph.names?.[last] ?? "" });
+      if (station && !out.some((d) => d.station.id === station.id)) {
+        out.push({ station, walk: { straight: 0, meters: 0, minutes: 0 }, zone: { line: zone.line, commune: match } });
+      }
+    }
+  }
+  return out;
+}
+
 // Plage horaire où le compte à rebours fonctionne (de 18 h à 3 h à Bordeaux), qui peut passer
 // minuit. On y est quand sa fin arrive avant son prochain début.
 export function inServiceWindow(now, { timeZone, startHour, endHour }) {

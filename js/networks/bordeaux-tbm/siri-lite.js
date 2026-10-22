@@ -46,11 +46,20 @@ async function siri(endpoint, params = {}, signal) {
   return res.json();
 }
 
-const isTramLine = (name, code) => /^tram\b/i.test(name) && /^[a-f]$/i.test(code);
 
-// Lignes de tram + points d'arrêt physiques desservis par au moins un tram. Appelé seulement par
-// tools/build-graph.mjs, qui en tire stops.js : le site ne fait plus ces deux appels lourds.
-export async function loadNetwork() {
+// Familles de lignes : (nom, code de l'API) → code affiché, ou null si la ligne n'en fait pas partie.
+// Le code de l'API est faux pour TBNight (vérifié le 01/10/2026 : « TBNight » pour la N1, « N1 »
+// pour la N8, « N2 » à « N7 » justes) : on prend le numéro dans le nom, « TBNight N8 ».
+export const LINE_KINDS = {
+  tram: (name, code) => (/^tram\b/i.test(name) && /^[a-f]$/i.test(code) ? code.toUpperCase() : null),
+  night: (name) => name.match(/^tbnight (n\d)$/i)?.[1].toUpperCase() ?? null,
+};
+
+// Lignes d'une famille + points d'arrêt physiques desservis par au moins une d'elles. Appelé
+// seulement par tools/build-graph.mjs, qui en tire stops.js (ou night-stops.js) : le site ne fait
+// plus ces deux appels lourds.
+export async function loadNetwork(kind = "tram") {
+  const codeOf = LINE_KINDS[kind];
   const [linesJson, stopsJson] = await Promise.all([
     siri("lines-discovery.json"),
     siri("stoppoints-discovery.json"),
@@ -59,8 +68,8 @@ export async function loadNetwork() {
   const lines = {};
   for (const l of linesJson?.Siri?.LinesDelivery?.AnnotatedLineRef ?? []) {
     const ref = val(l.LineRef);
-    const code = val(l.LineCode);
-    if (isTramLine(val(l.LineName), code)) lines[ref] = { ref, code: code.toUpperCase() };
+    const code = codeOf(val(l.LineName).trim(), val(l.LineCode));
+    if (code) lines[ref] = { ref, code };
   }
 
   const stops = [];

@@ -43,6 +43,8 @@ Ajoutez ou adaptez un test lorsque le comportement calculé change. Toute modifi
 npm run graph
 ```
 
+Pour les bus de nuit TBNight, `npm run graph -- --night` génère `night-stops.js` et `night-graph.js`, à lancer un jeudi, vendredi ou samedi après-midi (l'API ne connaît alors que les courses de la nuit qui vient).
+
 La même commande génère `js/networks/bordeaux-tbm/stops.js` : les lignes et arrêts de tram, que le site charge sans appeler l'API (`npm run graph -- --stops-only` ne régénère que lui).
 
 Relancez-la après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée et hors travaux** : le soir ou un jour de travaux, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
@@ -127,6 +129,7 @@ tools/serve.py                       serveur local sans cache (npm run serve)
 lab/                                page de tests locale (heure simulée, écrans forcés), jamais publiée
 js/features/index.js                 registre des types d'information
 js/features/last-ride/               « Le dernier tram pour rentrer » : écrans et calcul pur
+js/features/night-ride/              « Le dernier bus de nuit pour rentrer » (TBNight), même écran
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
 tests/registry.test.mjs              tests des registres et du stockage du domicile
 ```
