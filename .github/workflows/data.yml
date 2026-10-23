@@ -1,10 +1,11 @@
-# Chaque semaine (et à la demande) : recharge les données tirées du GTFS de TBM (horaires du soir,
-# tracés des lignes) sur une branche data-refresh créée depuis main, ouvre une pull request vers main,
+# Ravi — ravitaille les données. Chaque semaine (et à la demande) : recharge les données tirées du GTFS de TBM (arrêts et graphe des
+# bus de jour, correspondances à pied, horaires du soir, tracés des lignes) sur une branche data-refresh créée depuis main, ouvre une pull request vers main,
 # attend que ses vérifications (l'Action « Tests ») passent, la fusionne, puis supprime la branche.
 # Les horaires couvrent 21 jours : une semaine manquée ne casse rien, et sans données pour la soirée le
 # site revient de lui-même à l'ancienne méthode (CONTEXT.md, section 11, piste 10). Une semaine en échec
 # laisse la pull request ouverte ; la suivante met à jour la même branche et la même pull request.
-# Le graphe des lignes (npm run graph) reste manuel : il dépend du flux SIRI, en journée et hors travaux.
+# Les arrêts et le graphe du tram et de TBNight (npm run graph) restent manuels : ils dépendent du flux
+# SIRI, en journée et hors travaux.
 #
 # Réglage à activer une fois : Settings > Actions > General > « Allow GitHub Actions to create and
 # approve pull requests ».
@@ -47,6 +48,14 @@ jobs:
         with:
           node-version: 22
           package-manager-cache: false # aucune dépendance npm, rien à mettre en cache
+
+      - name: Arrêts et graphe des bus de jour
+        # Tirés du GTFS, comme les horaires : aucun appel au flux SIRI.
+        run: npm run bus
+
+      - name: Correspondances à pied
+        # Incrémental : l'IGN n'est appelé que pour les paires de stations nouvelles.
+        run: npm run transfers
 
       - name: Horaires du soir
         run: npm run timetable

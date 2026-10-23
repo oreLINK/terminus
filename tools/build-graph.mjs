@@ -12,6 +12,7 @@
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { loadNetwork, loadTimetable } from "../js/networks/bordeaux-tbm/siri-lite.js";
+import { isContained } from "./gtfs.mjs"; // motifs : courses partielles ou limitées par des travaux retirées
 
 const KIND = process.argv.includes("--night") ? "night" : "tram";
 const PREFIX = KIND === "night" ? "night-" : "";
@@ -20,13 +21,6 @@ const OUT = new URL(`../js/networks/bordeaux-tbm/${PREFIX}graph.js`, import.meta
 const STOPS_OUT = new URL(`../js/networks/bordeaux-tbm/${PREFIX}stops.js`, import.meta.url);
 // Les arrêts viennent de la liste du réseau, pas des courses : travaux et heure de lancement n'y changent rien.
 const STOPS_ONLY = process.argv.includes("--stops-only");
-
-// `inner` apparaît d'un seul tenant dans `outer` : course partielle ou limitée par des travaux.
-function isContained(inner, outer) {
-  if (inner.length >= outer.length) return false;
-  const start = outer.indexOf(inner[0]);
-  return start >= 0 && inner.every((ref, i) => outer[start + i] === ref);
-}
 
 const { lines, stops } = await loadNetwork(KIND);
 const j = JSON.stringify;

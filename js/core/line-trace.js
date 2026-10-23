@@ -1,4 +1,4 @@
-// Tracés des lignes (voies du tram, rues du bus) : encodage compact, simplification, et découpage
+// Tom — le tracé des lignes (voies du tram, rues du bus) : encodage compact, simplification, et découpage
 // d'un tracé entre l'arrêt de montée et celui de descente, pour que la carte suive les voies au lieu
 // de relier les arrêts en ligne droite. Fonctions pures, sans navigateur (testées avec Node, et
 // utilisées par tools/build-shapes.mjs).

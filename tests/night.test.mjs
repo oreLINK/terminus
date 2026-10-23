@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { isPublicHoliday } from "../js/core/holidays.js";
-import { buildIndex, serviceMorning, communeOf, zoneDests } from "../js/features/last-ride/planner.js";
+import { buildIndex, zoneDests } from "../js/core/stations.js";
+import { serviceMorning } from "../js/core/dates.js";
+import { communeOf } from "../js/core/text.js";
 import tbm from "../js/networks/bordeaux-tbm/index.js";
 
 const night = tbm.features["night-ride"];

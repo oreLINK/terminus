@@ -5,6 +5,7 @@
 // sheetNote) pour se ressembler : choix en cartes, valeur actuelle, actions en lignes, note.
 
 import { esc } from "./util.js";
+import { icon } from "./icons.js";
 
 const CLOSE_MS = 180;
 const DRAG_CLOSE_PX = 80;
@@ -108,21 +109,11 @@ export function closeSheet() {
 
 // ---------- Briques communes ----------
 
-// Pictogrammes des actions : viser (localisation), flèche de navigation (itinéraire), repère (lieu).
-const ICONS = {
-  locate: `<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/>`,
-  go: `<path d="M20 4 4 11l7 2 2 7 7-16Z"/>`,
-  pin: `<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/>`,
-};
-
 // Éclair du mode automatique : dans l'en-tête (sélecteur de ville) et devant « Automatique ».
-export const boltSvg = (className) =>
-  `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6L13 3Z"/></svg>`;
+export const boltSvg = (className) => icon("bolt", className);
 
 // Libellé du choix automatique, le même dans toutes les feuilles.
 export const AUTOMATIC = `${boltSvg("sheet-bolt")}Automatique`;
-
-const icon = (name) => `<svg class="sheet-glyph" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 
 // Liste de choix. Chaque choix : { action, value, main, detail, pressed }. `main` et `detail`
 // sont du HTML déjà échappé par l'appelant (ils peuvent contenir des badges de ligne).
@@ -147,7 +138,7 @@ export function sheetCurrent(label, value) {
 
 // Action secondaire en pleine largeur : un bouton (`action`) ou un lien externe (`href`).
 export function sheetAction({ icon: name, label, action, href }) {
-  const inner = `${icon(name)}<span>${esc(label)}</span>`;
+  const inner = `${icon(name, "sheet-glyph")}<span>${esc(label)}</span>`;
   return href
     ? `<a class="sheet-action" href="${esc(href)}" target="_blank" rel="noopener">${inner}</a>`
     : `<button type="button" class="sheet-action" data-action="${esc(action)}">${inner}</button>`;

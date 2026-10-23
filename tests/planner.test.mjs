@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseJourneys } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, nearestStations, candidateStations, transferMap, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, sameTrip, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
+import { transferMap, candidateLines, routeRequests, plan, sameTrip, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
+import { buildIndex, nearestStations, candidateStations } from "../js/core/stations.js";
+import { serviceEndAfter, inServiceWindow } from "../js/core/dates.js";
 
 // Ligne A fictive d'ouest en est : Ouest -> Centre -> Pont -> Est, un quai par sens.
 const A = "bordeaux:Line:59:LOC";

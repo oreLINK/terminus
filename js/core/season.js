@@ -1,4 +1,4 @@
-// Thème de saison (js/themes/, THEMES.md) : imposé par ses dates d'activation, il habille le site
+// Coco, côté page — thème de saison (js/themes/, THEMES.md) : imposé par ses dates d'activation, il habille le site
 // sans toucher aux modes. Posé sur <html> (data-season), avec sa feuille de style chargée après
 // style.css et ses animations, puis revérifié chaque minute : un thème commence ou finit à l'heure
 // dite même si la page reste ouverte. L'horloge est celle du site (mode test compris).

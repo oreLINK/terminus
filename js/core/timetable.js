@@ -1,15 +1,17 @@
+// Léa (lit les horaires du soir) et Rémi (y recolle le temps réel, mergeLive).
 // Horaires théoriques du soir, inclus dans le site (générés depuis le GTFS par
 // tools/build-timetable.mjs) : ils donnent les courses au même format que le flux SIRI (voir
 // parseJourneys), pour calculer le trajet sans appeler l'API, puis ne demander le temps réel que pour
 // les lignes du trajet retenu (mergeLive). CONTEXT.md, section 11, piste 10. Fonctions pures, sauf
 // eveningJourneys qui charge les fichiers par l'adaptateur.
 
-import { zonedTime } from "./util.js";
+import { zonedTime } from "./dates.js";
 
 // Courses d'un jour de service. `refs` traduit les identifiants GTFS en identifiants SIRI du réseau :
 // { line(route_id), stop(stop_id), journey(trip_id) }. `lines` : les lignes à garder (Set de refs
-// SIRI), facultatif. Les heures GTFS comptent depuis « midi moins 12 h » du jour de service.
-export function buildJourneys(index, day, date, refs, lines = null) {
+// SIRI), facultatif. `nameOf(ref SIRI)` : nom d'un quai (les arrêts du mode, déjà chargés ; les
+// horaires ne répètent pas les noms). Les heures GTFS comptent depuis « midi moins 12 h » du jour.
+export function buildJourneys(index, day, date, refs, lines = null, nameOf = (ref) => ref) {
   const base = zonedTime(`${date} 12:00`, index.timeZone) - 12 * 3600 * 1000;
   const out = [];
   for (const [tripId, pi, qi, start] of day.trips) {
@@ -21,28 +23,36 @@ export function buildJourneys(index, day, date, refs, lines = null) {
     const calls = stops.map((id, k) => {
       if (k) t += deltas[k];
       const ms = base + t * 1000;
-      return { ref: refs.stop(id), name: index.stops[id] ?? id, dep: ms, depLive: false, arr: ms, arrLive: false, cancelled: false };
+      const ref = refs.stop(id);
+      return { ref, name: nameOf(ref), dep: ms, depLive: false, arr: ms, arrLive: false, cancelled: false };
     });
     out.push({ id: refs.journey(tripId), line, direction: String(direction), headsign: calls[calls.length - 1].name, calls, theoretical: true });
   }
   return out;
 }
 
-// Courses théoriques des jours donnés (le soir, et le lendemain pour les bus de nuit, que le GTFS
-// range sur le jour du matin), ou null si un jour manque : fichier périmé, l'appelant revient alors
-// à l'ancienne méthode. `source` : { loadIndex(), loadDay(type), refs }.
-export async function eveningJourneys(source, dates, lines = null) {
+// Courses théoriques du soir `evening` (AAAA-MM-JJ), et du lendemain `nextDate` si les horaires le
+// demandent (`nextDay` : bus de nuit, que le GTFS range sur le jour du matin), ou null si un jour
+// manque : fichier périmé, l'appelant revient alors à l'ancienne méthode. `source` : { loadIndex(),
+// loadDay(type), refs }, ou une liste de sources, assemblées (un mode qui combine tram et bus) : null
+// si l'une manque.
+export async function eveningJourneys(source, evening, nextDate, lines = null, nameOf = undefined) {
+  if (Array.isArray(source)) {
+    const parts = await Promise.all(source.map((s) => eveningJourneys(s, evening, nextDate, lines, nameOf)));
+    return parts.some((p) => p == null) ? null : parts.flat();
+  }
   const index = await source.loadIndex();
   const out = [];
+  const dates = index?.nextDay ? [evening, nextDate] : [evening];
   for (const date of dates) {
     const type = index?.days?.[date];
     if (type == null) return null;
-    out.push(...buildJourneys(index, await source.loadDay(type), date, source.refs, lines));
+    out.push(...buildJourneys(index, await source.loadDay(type), date, source.refs, lines, nameOf));
   }
   return out;
 }
 
-// Applique le temps réel des (ligne, sens) interrogés aux courses théoriques. Le temps réel corrige
+// Rémi — applique le temps réel des (ligne, sens) interrogés aux courses théoriques. Le temps réel corrige
 // ou annule, mais une absence ne prouve rien : le flux SIRI de TBM omet des courses bien réelles
 // (constaté le 23/10/2026 : les courses d'après minuit d'un soir, dont il ne garde que celles de la
 // veille, l'identifiant d'une course de semaine se répétant chaque jour) et en publie de fantômes
@@ -84,7 +94,3 @@ export function mergeLive(journeys, requests, live) {
   }
   return [...out.filter(Boolean), ...added];
 }
-
-// Jours de service au format AAAA-MM-JJ.
-export const isoDate = ({ year, month, day }) =>
-  `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

@@ -1,11 +1,15 @@
 // Mode « Le dernier tram » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, candidateStations, transferMap, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, serviceMorning, addDays, communeOf, zoneDests, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { transferMap, candidateLines, routeRequests, plan, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, candidateStations, zoneDests } from "../../core/stations.js";
+import { serviceEndAfter, inServiceWindow, serviceMorning, addDays, isoDate } from "../../core/dates.js";
+import { communeOf } from "../../core/text.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc, distanceM } from "../../core/util.js";
+import { icon } from "../../core/icons.js";
 import { fetchWalk, realWalk } from "../../core/walk-route.js";
-import { eveningJourneys, mergeLive, isoDate } from "../../core/timetable.js";
+import { eveningJourneys, mergeLive } from "../../core/timetable.js";
 import { decodeLine } from "../../core/line-trace.js";
 import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
@@ -41,18 +45,17 @@ const MODES = ["comfortable", "latest"];
 // Adresse du domicile masquée dans sa pastille (par défaut), contre les regards par-dessus l'épaule.
 const HIDE_HOME_KEY = "dt.home-hidden.v1";
 
-// Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
-// une maison pour le domicile.
+// Pictogrammes de la tuile (js/core/icons.js), chacun avec sa classe.
 const ICONS = {
-  here: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/></svg>`,
-  home: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>`,
-  go: `<svg class="route-go-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7 7-16Z"/></svg>`,
-  refresh: `<svg class="meta-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>`,
-  walk: `<svg class="summary-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4.5" r="1.8"/><path d="M12.5 8 10 14l3.5 3 1.5 4.5M10 14l-2 7M11.5 9.5 8 12v3M13 8.5l2.5 3.5H19"/></svg>`,
-  expand: `<svg class="expand-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></svg>`,
+  here: icon("locate", "trip-glyph"),
+  home: icon("home", "trip-glyph"),
+  go: icon("go", "route-go-glyph"),
+  refresh: icon("refresh", "meta-glyph"),
+  walk: icon("walk", "summary-glyph"),
+  expand: icon("expand", "expand-glyph"),
   // Œil : afficher l'adresse ; œil barré : la masquer (l'action que fait le bouton de l'en-tête).
-  eye: `<svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>`,
-  eyeOff: `<svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5.8c.6-.2 1.3-.3 2-.3 6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.3 7.3A16.5 16.5 0 0 0 2.5 12S6 18.5 12 18.5c1.8 0 3.3-.5 4.6-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2M3.5 3.5l17 17"/></svg>`,
+  eye: icon("eye", "picker-icon"),
+  eyeOff: icon("eyeOff", "picker-icon"),
 };
 
 // Barre fine où glisse un segment, comme un tram sur sa ligne : visible pendant un calcul.
@@ -76,6 +79,8 @@ export function mount({ root, network, adapter, goal = "last" }) {
     index: null,
     graph: undefined, // graphe du réseau : undefined tant qu'il n'est pas chargé, null s'il n'y en a pas
     transfers: null, // correspondances à pied entre stations proches (transferMap), chargées avec les arrêts
+    names: new Map(), // nom de chaque quai (ref SIRI → nom), pour les horaires inclus
+    colors: new Map(), // couleurs des lignes données par les arrêts générés (bus) : code → { color, ink }
     lineCodes: {},
     timer: null,
     busy: false,
@@ -286,6 +291,10 @@ export function mount({ root, network, adapter, goal = "last" }) {
     if (state.index) return;
     const [data, transfers] = await Promise.all([adapter.loadStops(), adapter.loadTransfers?.().catch(() => null)]);
     state.index = buildIndex(data.stops);
+    state.names = new Map(data.stops.map((x) => [x.ref, x.name])); // noms des quais, pour les horaires inclus
+    state.colors = new Map(
+      Object.values(data.lines).filter((l) => l.color).map((l) => [l.code, { color: l.color, ink: l.textColor ?? "#FFFFFF" }]),
+    );
     state.lineCodes = Object.fromEntries(Object.values(data.lines).map((l) => [l.ref, l.code]));
     // Sans fichier de correspondances, on change seulement dans une même station, comme avant.
     state.transfers = transferMap(transfers?.rows, state.index, decodeLine);
@@ -307,11 +316,15 @@ export function mount({ root, network, adapter, goal = "last" }) {
   // Horaires à charger, par paliers du plus léger au réseau entier : le calcul s'arrête au premier
   // palier qui donne un trajet. Avec le graphe : le trajet le plus simple, puis une correspondance
   // de plus. Sans graphe : les lignes des deux côtés. Le dernier palier rattrape un graphe périmé.
+  // Le dernier recours (tout le réseau) n'est permis que pour un petit réseau : 12 (ligne, sens) pour
+  // le tram, mais 124 pour les bus de jour, autant d'appels d'un coup (MAX_ALL_REQUESTS).
+  const MAX_ALL_REQUESTS = 40;
   function loadStages(origins, dests) {
-    const all = bothWays(Object.keys(state.lineCodes));
-    if (!state.graph) return [bothWays(candidateLines(origins, dests)), all];
+    const everything = bothWays(Object.keys(state.lineCodes));
+    const all = everything.length <= MAX_ALL_REQUESTS ? [everything] : [];
+    if (!state.graph) return [bothWays(candidateLines(origins, dests)), ...all];
     const args = { graph: state.graph, index: state.index, origins, dests, transfers: state.transfers };
-    return [routeRequests(args), routeRequests({ ...args, extraTransfers: 1 }), all];
+    return [routeRequests(args), routeRequests({ ...args, extraTransfers: 1 }), ...all];
   }
 
   // Les courses des (ligne, sens) demandés, jusqu'à la fin du service. Un échec partiel est signalé
@@ -344,7 +357,10 @@ export function mount({ root, network, adapter, goal = "last" }) {
     const shown = visible || !state.lastComputedFrom;
     if (shown) setComputing(true, "Calcul du trajet…");
     try {
-      await Promise.all([ensureStops(), ensureGraph()]);
+      // Méthode de calcul : celle du réseau, ou celle que le mode test force. Le graphe ne sert qu'à
+      // l'ancienne méthode et aux zones à la demande : la nouvelle ne le charge pas (bus : 43 Ko).
+      const method = lab?.method ?? adapter.method ?? "siri";
+      await Promise.all([ensureStops(), method !== "offline" || adapter.zones ? ensureGraph() : null]);
       if (state.unmounted) return;
 
       if (walkBetween(here, state.home).straight < 300) {
@@ -354,7 +370,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
       }
 
       // Candidats ligne par ligne : la station la plus proche de chaque ligne, plus les plus proches.
-      const origins = withRealWalks(candidateStations(state.index.stations, here, { radius: 2000, min: 2, max: 10 }), "origins", here);
+      const origins = withRealWalks(candidateStations(state.index.stations, here, adapter.candidates?.origins ?? { radius: 2000, min: 2, max: 10 }), "origins", here);
       // Zones à la demande (TBNight) : si le domicile est dans une commune de zone, le dernier arrêt
       // fixe de la ligne y mène sans marche (on reste dans le bus), même s'il est aussi à portée à pied.
       const zones = zoneDests({
@@ -364,7 +380,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
         index: state.index,
         lineCodes: state.lineCodes,
       });
-      const near = withRealWalks(candidateStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 8 }), "dests", state.home);
+      const near = withRealWalks(candidateStations(state.index.stations, state.home, adapter.candidates?.dests ?? { radius: 1500, min: 1, max: 8 }), "dests", state.home);
       const dests = [...near.filter((d) => !zones.some((z) => z.station.id === d.station.id)), ...zones];
       const loaded = new Set();
       let journeys = [];
@@ -373,18 +389,17 @@ export function mount({ root, network, adapter, goal = "last" }) {
       let now = clockNow();
       const serviceEnd =
         endHour == null ? Infinity : serviceEndAfter(now, { timeZone: network.timeZone, hour: endHour });
-      const stages = loadStages(origins, dests);
-      // Nouvelle méthode (horaires théoriques inclus, temps réel ciblé) si le réseau la choisit
-      // (adapter.method) ou si le mode test la force, et que les horaires couvrent la soirée ; sinon,
-      // l'ancienne ci-dessous.
-      const method = lab?.method ?? adapter.method ?? "siri";
+      // Nouvelle méthode (horaires théoriques inclus, temps réel ciblé) si elle est choisie et que les
+      // horaires couvrent la soirée ; sinon, l'ancienne ci-dessous, avec le graphe chargé au besoin.
       const offline = method === "offline" ? await offlineJourneys(now, origins, dests, serviceEnd) : null;
+      if (!offline) await ensureGraph();
+      const stages = offline ? [] : loadStages(origins, dests);
       if (state.unmounted) return;
       if (offline) {
         ({ journeys, failed, result } = offline);
         now = clockNow();
       }
-      for (const stage of offline ? [] : stages) {
+      for (const stage of stages) {
         const todo = stage.filter((r) => !loaded.has(`${r.line}|${r.direction}`));
         if (result && !todo.length) continue;
         for (const r of todo) loaded.add(`${r.line}|${r.direction}`);
@@ -398,7 +413,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
       }
       // Avec les horaires théoriques, les courses passées sont connues : le calcul voit seul que le
       // dernier est parti, sans cette déduction.
-      const overHint = Boolean(!offline && state.graph && stages[0].length);
+      const overHint = Boolean(!offline && state.graph && stages[0]?.length);
       // Mode test : la méthode réellement utilisée, lisible par la page d'essai et le bandeau.
       if (lab) document.documentElement.dataset.method = offline ? "offline" : "siri";
       state.lastComputedFrom = here;
@@ -429,7 +444,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
     const evening = addDays(morning(), -1);
     let journeys;
     try {
-      journeys = await eveningJourneys(adapter.evening, [isoDate(evening), isoDate(addDays(evening, 1))], new Set(Object.keys(state.lineCodes)));
+      journeys = await eveningJourneys(adapter.evening, isoDate(evening), isoDate(addDays(evening, 1)), new Set(Object.keys(state.lineCodes)), (ref) => state.names.get(ref) ?? ref);
     } catch {
       return null;
     }
@@ -555,12 +570,17 @@ export function mount({ root, network, adapter, goal = "last" }) {
 
   // ---------- Rendu ----------
 
+  // Couleur officielle d'une ligne : celle des arrêts générés (bus, avec leur couleur GTFS), sinon la
+  // table du réseau (tram, TBNight) ; texte du badge assorti.
+  const lineColorOf = (code) => state.colors.get(code)?.color ?? network.lineColors?.[code];
+  const lineInkOf = (code) => state.colors.get(code)?.ink ?? network.lineInk ?? "#FFFFFF";
+
   const badges = (codes) =>
     codes
       .map((c) => {
-        const color = network.lineColors?.[c];
-        const style = color ? ` style="--line: ${color}; --line-ink: ${network.lineInk ?? "#FFFFFF"}"` : "";
-        return `<span class="line-badge"${style} aria-label="${esc(adapter.vehicle)} ${esc(c)}">${esc(c)}</span>`;
+        const color = lineColorOf(c);
+        const style = color ? ` style="--line: ${color}; --line-ink: ${lineInkOf(c)}"` : "";
+        return `<span class="line-badge"${style} aria-label="${esc(adapter.lineLabel ?? adapter.vehicle)} ${esc(c)}">${esc(c)}</span>`;
       })
       .join("");
 
@@ -570,7 +590,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
     const trip = option.last;
     const legs = trip.legs;
     const final = legs[legs.length - 1];
-    const lineColor = (code) => network.lineColors?.[code] ?? "var(--ink)";
+    const lineColor = (code) => lineColorOf(code) ?? "var(--ink)";
     const seg = (kind) =>
       kind === "walk"
         ? `<span class="rail-seg is-walk"></span>`
@@ -694,9 +714,14 @@ export function mount({ root, network, adapter, goal = "last" }) {
 
   // Tracé affiché : celui du mode choisi. Sans tracé « pratique » (service terminé), le plus tard.
   // Sans choix affiché (les deux partent à la même heure), le plus pratique.
+  // Le choix n'est proposé que s'il fait gagner au moins 2 minutes : en deçà, c'est du bruit.
+  const MIN_GAIN_MS = 2 * 60 * 1000;
   const offersChoice = (result) =>
     goal === "last" &&
-    result?.comfortable && result.primary && result.primary.leaveBy > result.comfortable.leaveBy && !sameTrip(result.comfortable, result.primary);
+    result?.comfortable &&
+    result.primary &&
+    result.primary.leaveBy - result.comfortable.leaveBy >= MIN_GAIN_MS &&
+    !sameTrip(result.comfortable, result.primary);
   const chosen = (result) =>
     goal === "next"
       ? result?.soonest || result?.primary || null
@@ -706,7 +731,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
   const walkToMin = (option) => option.origin.walk.minutes + WALK_MARGIN_MS / 60000;
   const transfersText = (option) =>
     option.transfers === 0 ? "direct" : `${option.transfers} correspondance${option.transfers > 1 ? "s" : ""}`;
-  const mapLineColor = (code) => network.lineColors?.[code] ?? "currentColor";
+  const mapLineColor = (code) => lineColorOf(code) ?? "currentColor";
 
   // Résumé du trajet en deux lignes, à lire d'un coup d'œil : où marcher, puis quel tram jusqu'où.
   function summaryHtml(option) {

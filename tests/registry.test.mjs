@@ -13,10 +13,10 @@ const { NETWORKS, getNetwork, networkAt } = await import("../js/networks/index.j
 const { FEATURES, DEFAULT_FEATURE, featuresFor } = await import("../js/features/index.js");
 const { getHome, saveHome } = await import("../js/core/home.js");
 
-// Tous les adaptateurs « dernier trajet » (tram, bus de nuit) : ils partagent l'écran de last-ride.
+// Tous les adaptateurs « dernier trajet » (tram, bus, tram et bus, bus de nuit) : ils partagent l'écran de last-ride.
 const rideAdapters = () =>
   NETWORKS.flatMap((n) =>
-    ["last-ride", "night-ride"].filter((id) => n.features[id]).map((id) => ({ n, id, a: n.features[id] })),
+    ["last-ride", "last-bus", "last-transport", "night-ride"].filter((id) => n.features[id]).map((id) => ({ n, id, a: n.features[id] })),
   );
 
 test("chaque réseau est complet et ne déclare que des modes connus", () => {
@@ -38,7 +38,9 @@ test("chaque réseau est complet et ne déclare que des modes connus", () => {
     // Méthode de calcul : « siri » ou « offline », et pas de nouvelle méthode sans horaires inclus.
     for (const [id, f] of Object.entries(n.features)) {
       assert.ok([undefined, "siri", "offline"].includes(f.method), `${n.id} ${id} : méthode ${f.method}`);
-      if (f.method === "offline") assert.ok(f.evening?.loadIndex && f.evening?.refs, `${n.id} ${id} : horaires inclus manquants`);
+      // Une source d'horaires, ou une liste de sources assemblées (mode qui combine tram et bus).
+      const sources = [f.evening].flat();
+      if (f.method === "offline") assert.ok(sources.length && sources.every((x) => x?.loadIndex && x?.refs), `${n.id} ${id} : horaires inclus manquants`);
     }
   }
 });
@@ -130,7 +132,7 @@ test("la ville est choisie d'après la position", () => {
   assert.equal(networkAt({ lat: 44.8378, lon: -0.5792 })?.id, "bordeaux-tbm"); // place de la Comédie
   assert.equal(networkAt({ lat: 48.8566, lon: 2.3522 }), null); // Paris : aucun réseau
   assert.equal(networkAt(null), null);
-  assert.deepEqual(featuresFor(getNetwork("bordeaux-tbm")).map((f) => f.id), ["last-ride", "night-ride"]);
+  assert.deepEqual(featuresFor(getNetwork("bordeaux-tbm")).map((f) => f.id), ["last-ride", "last-bus", "last-transport", "night-ride"]);
 });
 
 test("le domicile est rangé par réseau et l'ancienne adresse est reprise", () => {

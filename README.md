@@ -1,17 +1,59 @@
 # Terminus : guide développeur
 
-Terminus est un site statique qui aide à déterminer quel tram prendre pour rentrer chez soi dans Bordeaux Métropole, directement ou avec correspondance. La description destinée aux utilisateurs se trouve dans [PROJECT.md](PROJECT.md) ; le contexte technique détaillé et les invariants du projet sont dans [CONTEXT.md](CONTEXT.md).
+Terminus est un site statique qui dit quand partir pour attraper le dernier tram, bus ou bus de nuit jusqu'à sa destination dans Bordeaux Métropole, directement ou avec correspondance. La description destinée aux utilisateurs se trouve dans [PROJECT.md](PROJECT.md) ; le contexte technique détaillé et les invariants du projet sont dans [CONTEXT.md](CONTEXT.md).
 
 ## Technologies et architecture
 
 - HTML, CSS et JavaScript moderne en modules ES natifs ; aucun framework, build ni dépendance npm à l'exécution.
-- APIs publiques appelées directement depuis le navigateur : SIRI-Lite de Bordeaux Métropole et géocodage de la Géoplateforme IGN.
+- APIs publiques appelées directement depuis le navigateur : SIRI-Lite de Bordeaux Métropole (temps réel) et Géoplateforme IGN (géocodage, itinéraire piéton, fond de carte). Le GTFS statique de TBM n'est lu qu'à la génération des données.
 - GitHub Pages pour l'hébergement statique.
 - Node.js 18 ou plus récent pour les tests ; Python 3 pour le serveur local.
 - Polices : celles de l'appareil (SF Pro sur iPhone, Roboto sur Android) : aucune police n'est téléchargée, aucune ressource n'est chargée depuis un service tiers au démarrage.
 - La logique de calcul (`js/features/last-ride/planner.js`) est pure et se teste avec `node:test` sans navigateur, comme les registres de réseaux et de modes.
 
-`package.json` ne déclare aucune dépendance : ses scripts servent aux tests et au serveur local.
+`package.json` ne déclare aucune dépendance : ses scripts servent aux tests, aux générateurs de données et au serveur local.
+
+## Fonctionnalités techniques
+
+Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'utilisateur sont dans [PROJECT.md](PROJECT.md) (tableau « Disponibilité par ville ») ; le détail de chaque brique, dans [CONTEXT.md](CONTEXT.md). Les prénoms désignent les outils internes (tableau « Les outils internes », `CONTEXT.md`, section 4).
+
+🟢 disponible · 🟡 prévu · 🔴 écarté pour l'instant
+
+| | | État | Précisions |
+|---|---|---|---|
+| **Calcul** | Itinéraire à rebours avec jusqu'à deux correspondances (Bob) | 🟢 | Profils par nombre de correspondances, pur, testé ; le plus tard, le plus pratique, le prochain ; boucles écartées |
+| | Correspondances à pied entre stations proches | 🟢 | Précalculées à la génération (IGN), aucun appel à l'exécution |
+| | Stations candidates ligne par ligne (Inès) | 🟢 | La plus proche de chaque ligne, pour qu'une ligne dense ne masque pas les autres |
+| | Nouvelle méthode : horaires du soir inclus (Léa) + temps réel ciblé (Rémi, Sam) | 🟢 | Bus et transport ; tram et TBNight encore sur l'ancienne méthode, en attente de la bascule |
+| | Ancienne méthode : horaires SIRI par ligne, par paliers | 🟢 | Gardée en secours (données manquantes ou périmées) jusqu'à la fin des tests de fiabilité |
+| | Modes combinés par assemblage des données (Colette) | 🟢 | « Le dernier transport » : arrêts, graphes, tracés et horaires du tram et du bus, sans fichier en double |
+| | Profils gardés d'un recalcul à l'autre | 🟡 | Jusqu'à 3 calculs par actualisation, environ 0,3 s sur téléphone en mode transport |
+| **Appels réseau** | Temps réel limité aux lignes du trajet affiché | 🟢 | 1 à 3 appels SIRI par calcul (nouvelle méthode), cache mémoire et `sessionStorage` |
+| | Marche réelle par les rues (Max) | 🟢 | IGN, 2 appels à la fois, espacés, un nouvel essai sur refus ; seulement pour les stations empruntées |
+| | Données du réseau incluses dans le site | 🟢 | Arrêts, graphes, tracés, correspondances, horaires : aucun appel pour les charger, un fichier par mode, chargé à la demande |
+| | Mise en cache hors ligne (service worker) | 🟡 | 2ᵉ visite instantanée ; préalable à l'installation sur l'écran d'accueil |
+| | Flux GTFS-RT des retards de tout le réseau | 🔴 | 2,7 Mo : trop lourd toutes les 30 s sur un téléphone |
+| **Données** | Générateurs depuis le GTFS de TBM (Gus) | 🟢 | Arrêts et graphe des bus, horaires du soir sur 21 jours, tracés des lignes |
+| | Correspondances à pied incrémentales | 🟢 | Cache commun par paire de quais, sens du tracé conservé ; l'IGN n'est appelé que pour les nouvelles paires |
+| | Mise à jour automatique chaque lundi (Ravi) | 🟢 | Branche `data-refresh`, pull request, fusion si les tests passent, mise en ligne |
+| | Arrêts et graphes du tram et de TBNight tirés du GTFS | 🟡 | Aujourd'hui générés depuis SIRI (`npm run graph`) ; rendrait `build-graph.mjs` inutile |
+| | Identifiants courts dans les fichiers générés | 🟡 | Environ 30 à 40 % de moins sur les arrêts et les graphes |
+| | Alerte de données périmées | 🟡 | Échec de l'Action si le GTFS expire bientôt ; signal dans le labo |
+| **Cartes** | Fond Plan IGN avec Leaflet, chargé à la première carte (Carla) | 🟢 | Leaflet copié dans `vendor/`, aperçu figé dans la tuile, carte interactive dans la feuille |
+| | Tracé réel des lignes (Tom) | 🟢 | Encodé, simplifié, découpé entre la montée et la descente |
+| | Tuiles vectorielles, Leaflet en secours | 🟡 | MapLibre GL JS, style par apparence et par thème |
+| | Position des véhicules en temps réel | 🟡 | Flux GTFS-RT des véhicules (55 Ko), décodeur protobuf à écrire |
+| **Habillage** | Thèmes de saison imposés par leurs dates (Coco) | 🟢 | Calendrier dans `js/themes/index.js` et `THEMES.md`, vérifiés par un test |
+| | Apparence claire ou sombre, jetons de design | 🟢 | Jetons dans `:root`, couleur de la barre du navigateur lue dans le CSS |
+| **Architecture** | Plusieurs réseaux et plusieurs modes | 🟢 | Un objet réseau avec un adaptateur par mode, registres testés |
+| | Briques communes sans dépendance à une fonctionnalité | 🟢 | Dates, noms, stations, pictogrammes dans `js/core/` |
+| | Écran de `last-ride` découpé (calcul, marches, rendu, feuilles) | 🟡 | `index.js` fait 1 200 lignes |
+| | Table des modes unique par réseau | 🟡 | Lue par l'adaptateur et tous les générateurs : un mode = une ligne de configuration |
+| **Outillage** | Tests `node:test` sans navigateur | 🟢 | Calcul, registres, horaires, correspondances, tracés, marche, thèmes, labo |
+| | Mode test local (Simon) | 🟢 | Heure simulée, plage horaire, écrans forcés, choix de la méthode ; jamais publié |
+| | Comparateur des deux méthodes (Jules) | 🟢 | `npm run compare -- --mode last-bus` ; écarts classés (fantômes, temps réel…) |
+| | Serveur local sans cache | 🟢 | `npm run serve` |
+| | Tests, déploiement et données par GitHub Actions | 🟢 | `tests.yml`, `deploy.yml`, `data.yml` |
 
 ## Installation et développement
 
@@ -55,14 +97,20 @@ npm run shapes
 
 Relancez-la quand une ligne change de parcours. Sans tracé pour un tronçon, la carte relie les arrêts en ligne droite.
 
-`js/networks/bordeaux-tbm/evening/` contient les horaires théoriques du soir (21 jours), tirés du même GTFS, pour la nouvelle méthode de calcul, encore à l'essai (réglage « Méthode de calcul » de la page `/lab/`). Ils s'épuisent : relancez la commande chaque semaine. Sans horaires pour la soirée, le site revient à l'ancienne méthode.
+`js/networks/bordeaux-tbm/evening/` contient les horaires théoriques du soir (21 jours), tirés du même GTFS, pour la nouvelle méthode de calcul : celle des modes bus et transport ; le tram et TBNight restent sur l'ancienne jusqu'à la bascule (le réglage « Méthode de calcul » de la page `/lab/` force l'une ou l'autre). Ils s'épuisent : l'Action « Données du réseau » les régénère chaque semaine. Sans horaires pour la soirée, le site revient à l'ancienne méthode.
 
 ```sh
 npm run timetable
 npm run compare   # compare les deux méthodes sur le tram : à lancer de préférence le soir
 ```
 
-`js/networks/bordeaux-tbm/transfers.js` et `night-transfers.js` contiennent les correspondances à pied entre stations proches de noms différents, avec leur marche par les rues calculée une fois par l'IGN. Relancez-les après `npm run graph` (les stations viennent des arrêts) :
+Les bus de jour (`bus-stops.js`, `bus-graph.js`) sont tirés du GTFS, sans appel au flux SIRI : 62 lignes qui roulent le soir, hors lignes scolaires.
+
+```sh
+npm run bus
+```
+
+`js/networks/bordeaux-tbm/transfers.js`, `night-transfers.js`, `bus-transfers.js` et `transport-transfers.js` (tram et bus, avec les correspondances tram ↔ bus) contiennent les correspondances à pied entre stations proches de noms différents, avec leur marche par les rues calculée une fois par l'IGN. Relancez-les après `npm run graph` et `npm run bus` (les stations viennent des arrêts) ; la génération est incrémentale, l'IGN n'est appelé que pour les nouvelles paires :
 
 ```sh
 npm run transfers
@@ -87,13 +135,13 @@ Déroulé :
 
 Si un changement modifie les données échangées (nouveau service appelé, nouvelle clé de stockage, position envoyée ailleurs), mettez à jour `confidentialite.html` dans le même changement.
 
-Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJECT.md` pour l'expérience utilisateur, `README.md` pour le développement et la contribution, `CONTEXT.md` pour les règles et le contexte technique. Consultez la matrice détaillée de `CONTEXT.md`.
+Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJECT.md` pour l'expérience utilisateur (dont son tableau des fonctionnalités), `README.md` pour le développement et la contribution (dont le tableau « Fonctionnalités techniques »), `CONTEXT.md` pour les règles et le contexte technique. Consultez la matrice détaillée de `CONTEXT.md`, section 13.
 
 ### Actions
 
 - `.github/workflows/tests.yml` (**Tests**) : `npm test` à la demande, à chaque push sur `dev` et sur chaque pull request vers `main`.
 - `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
-- `.github/workflows/data.yml` (**Données du réseau**) : chaque lundi vers 6 h (heure de Paris) et à la demande. Crée la branche `data-refresh` depuis `main`, y recharge les horaires du soir (`npm run timetable`) et les tracés (`npm run shapes`) depuis le GTFS, lance `npm test`, ouvre une pull request `data-refresh` → `main`, attend que ses vérifications (l'Action « Tests », lancée sur la branche) passent, la fusionne, supprime `data-refresh` et relance la mise en ligne. Une semaine en échec laisse la pull request ouverte ; la suivante la met à jour. Réglage à activer une fois : *Settings → Actions → General → « Allow GitHub Actions to create and approve pull requests »*. Jeton personnel en secret `DATA_PR_TOKEN` facultatif (si la protection de `main` l'exige). Ces fusions arrivent sur `main` sans passer par `dev` : fusionnez `main` dans `dev` (`git merge origin/main`) avant d'ouvrir une pull request `dev` → `main`, en gardant la version de `main` pour les fichiers générés (ou en les régénérant).
+- `.github/workflows/data.yml` (**Données du réseau**) : chaque lundi à 4 h 17 UTC (6 h 17 à Paris l'été, 5 h 17 l'hiver) et à la demande. Crée la branche `data-refresh` depuis `main`, y recharge les arrêts des bus (`npm run bus`), les correspondances à pied (`npm run transfers`), les horaires du soir (`npm run timetable`) et les tracés (`npm run shapes`) depuis le GTFS, lance `npm test`, ouvre une pull request `data-refresh` → `main`, attend que ses vérifications (l'Action « Tests », lancée sur la branche) passent, la fusionne, supprime `data-refresh` et relance la mise en ligne. Une semaine en échec laisse la pull request ouverte ; la suivante la met à jour. Réglage à activer une fois : *Settings → Actions → General → « Allow GitHub Actions to create and approve pull requests »*. Jeton personnel en secret `DATA_PR_TOKEN` facultatif (si la protection de `main` l'exige). Ces fusions arrivent sur `main` sans passer par `dev` : fusionnez `main` dans `dev` (`git merge origin/main`) avant d'ouvrir une pull request `dev` → `main`, en gardant la version de `main` pour les fichiers générés (ou en les régénérant).
 
 La version en ligne est consultable à `https://<utilisateur>.github.io/<repo>/version.json`.
 
@@ -116,8 +164,8 @@ GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossi
 Le site est découpé en trois couches pour accueillir d'autres villes et d'autres informations :
 
 - `js/networks/` : un dossier par réseau de transport (ville, zone, couleurs de lignes, sources, adaptateurs d'API).
-- `js/features/` : un dossier par mode (aujourd'hui deux : « Le dernier tram », `last-ride`, et « Le prochain bus de nuit », `night-ride`).
-- `js/core/` : ce qui est commun (position, destination, stockage, feuilles, champ d'adresse, géocodage).
+- `js/features/` : un dossier par mode (aujourd'hui quatre : « Le dernier tram », `last-ride`, « Le dernier bus », `last-bus`, « Le dernier transport », `last-transport`, et « Le prochain bus de nuit », `night-ride`).
+- `js/core/` : ce qui est commun (position, destination, stockage, feuilles, champ d'adresse, géocodage, dates, index des stations, pictogrammes) et les outils internes nommés (Max, Inès, Léa, Rémi…, tableau dans `CONTEXT.md`, section 4).
 
 `js/app.js` choisit la ville et le mode (automatiquement ou via les sélecteurs de l'en-tête) et monte le module correspondant. Les interfaces sont détaillées dans [CONTEXT.md](CONTEXT.md), section 4.
 
@@ -143,10 +191,11 @@ confidentialite.html                 données personnelles et bouton d'effacemen
 vendor/leaflet/                      Leaflet 1.9.4 (carte), copié tel quel avec sa licence
 css/style.css                        styles et jetons de design
 js/app.js                            choix de la ville et de l'information, montage
-js/core/                             position, destination, stockage, feuilles, adresses, utilitaires
+js/core/                             position, destination, stockage, feuilles, adresses, dates, stations, icônes, utilitaires
 js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)
+tools/build-bus-network.mjs          génération des arrêts et du graphe des bus de jour depuis le GTFS (npm run bus)
 tools/build-transfers.mjs            génération des correspondances à pied (npm run transfers)
 tools/build-shapes.mjs               génération du tracé des lignes depuis le GTFS (npm run shapes)
 tools/build-timetable.mjs            génération des horaires du soir depuis le GTFS (npm run timetable)
@@ -158,9 +207,12 @@ js/themes/                           thèmes de saison (calendrier dans index.js
 js/core/season.js                    application du thème de saison actif
 THEMES.md                            calendrier des thèmes et procédure pour en ajouter un
 js/features/last-ride/               « Le dernier tram » : écrans et calcul pur
+js/features/last-bus/                « Le dernier bus » (bus de jour), même écran
+js/features/last-transport/          « Le dernier transport » (tram et bus combinés), même écran
 js/features/night-ride/              « Le prochain bus de nuit » (TBNight), même écran
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
 tests/registry.test.mjs              tests des registres et du stockage de la destination
+tests/compose.test.mjs               tests de l'assemblage des données de plusieurs modes
 tests/transfers.test.mjs             tests des correspondances à pied générées (stations, distances, tracés)
 tests/timetable.test.mjs             tests des horaires inclus (heures GTFS, jours manquants, fusion avec le temps réel)
 tests/walk-route.test.mjs            tests de l'itinéraire piéton (réponse IGN, nouvel essai, temps de marche)

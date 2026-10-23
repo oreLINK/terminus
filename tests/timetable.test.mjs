@@ -3,18 +3,21 @@ import { test } from "node:test";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { buildJourneys, eveningJourneys, mergeLive, isoDate } from "../js/core/timetable.js";
+import { buildJourneys, eveningJourneys, mergeLive } from "../js/core/timetable.js";
+import { isoDate } from "../js/core/dates.js";
 import tbm from "../js/networks/bordeaux-tbm/index.js";
-import index from "../js/networks/bordeaux-tbm/evening/index.js";
+import index from "../js/networks/bordeaux-tbm/evening/tram/index.js";
 import tramStops from "../js/networks/bordeaux-tbm/stops.js";
 
 const refs = tbm.features["last-ride"].evening.refs;
-const INDEX = { timeZone: "Europe/Paris", stops: { 1: "Ouest", 2: "Centre", 3: "Est" }, days: { "2026-10-24": 0, "2026-10-25": 0 } };
+const INDEX = { timeZone: "Europe/Paris", nextDay: true, days: { "2026-10-24": 0, "2026-10-25": 0 } };
+const NAMES = { "bordeaux:StopPoint:BP:1:LOC": "Ouest", "bordeaux:StopPoint:BP:2:LOC": "Centre", "bordeaux:StopPoint:BP:3:LOC": "Est" };
+const nameOf = (ref) => NAMES[ref] ?? ref;
 // Une course de la ligne 59 : départ 23 h 50, puis +4 min, puis +6 min (passe minuit : 24:00).
 const DAY = { patterns: [["59", 0, ["1", "2", "3"]]], profiles: [[0, 240, 360]], trips: [["b_1_1", 0, 0, 23 * 3600 + 50 * 60]] };
 
 test("horaires théoriques : heures absolues, au-delà de minuit, au format du flux SIRI", () => {
-  const [j] = buildJourneys(INDEX, DAY, "2026-10-24", refs);
+  const [j] = buildJourneys(INDEX, DAY, "2026-10-24", refs, null, nameOf);
   assert.equal(j.id, "bordeaux:ServiceJourney:b_1_1:LOC");
   assert.equal(j.line, "bordeaux:Line:59:LOC");
   assert.equal(j.direction, "0");
@@ -34,9 +37,12 @@ test("horaires théoriques : la nuit du changement d'heure suit la convention GT
 
 test("horaires théoriques : un jour absent rend null (fichier périmé, retour à l'ancienne méthode)", async () => {
   const source = { loadIndex: async () => INDEX, loadDay: async () => DAY, refs };
-  assert.equal((await eveningJourneys(source, ["2026-10-24", "2026-10-25"])).length, 2);
-  assert.equal(await eveningJourneys(source, ["2026-10-24", "2026-12-25"]), null);
-  assert.equal((await eveningJourneys(source, ["2026-10-24"], new Set(["bordeaux:Line:60:LOC"]))).length, 0);
+  assert.equal((await eveningJourneys(source, "2026-10-24", "2026-10-25")).length, 2); // soir et lendemain (nextDay)
+  assert.equal(await eveningJourneys(source, "2026-10-24", "2026-12-25"), null);
+  assert.equal((await eveningJourneys(source, "2026-10-24", "2026-10-25", new Set(["bordeaux:Line:60:LOC"]))).length, 0);
+  // Sans nextDay (tram, bus) : le soir seulement, le lendemain n'est pas chargé.
+  const tramLike = { ...source, loadIndex: async () => ({ ...INDEX, nextDay: false }) };
+  assert.equal((await eveningJourneys(tramLike, "2026-10-24", "2026-12-25")).length, 1);
 });
 
 test("temps réel ciblé : il corrige et annule, mais une absence ne supprime rien", () => {
@@ -69,10 +75,10 @@ test("temps réel ciblé : il corrige et annule, mais une absence ne supprime ri
 
 test("horaires générés : chaque jour a son fichier, et les quais du tram sont ceux de stops.js", async () => {
   for (const type of new Set(Object.values(index.days))) {
-    assert.ok(existsSync(fileURLToPath(new URL(`../js/networks/bordeaux-tbm/evening/day-${type}.js`, import.meta.url))), `day-${type}.js`);
+    assert.ok(existsSync(fileURLToPath(new URL(`../js/networks/bordeaux-tbm/evening/tram/day-${type}.js`, import.meta.url))), `day-${type}.js`);
   }
   const known = new Set(tramStops.stops.map((s) => s.ref));
-  const day = (await import(`../js/networks/bordeaux-tbm/evening/day-${Object.values(index.days)[0]}.js`)).default;
+  const day = (await import(`../js/networks/bordeaux-tbm/evening/tram/day-${Object.values(index.days)[0]}.js`)).default;
   const tramLines = new Set(Object.keys(tramStops.lines));
   const journeys = buildJourneys(index, day, Object.keys(index.days)[0], refs, tramLines);
   assert.ok(journeys.length > 100, "des courses de tram le soir");
