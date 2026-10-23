@@ -85,6 +85,12 @@
   --amb-3: #F1F4F7;
   --amb-4: #C9D3DD;
 
+  /* Logo (js/themes/logos.js) : panneau et points de la girouette, cases des palettes, pleine lune. */
+  --logo-panel: #0E151C;
+  --logo-led: #FFB547;
+  --logo-flap: #F4F1E8;
+  --logo-moon: #F3E3B0;
+
   --radius-panel: 18px;
   --radius-control: 12px;
   --measure: 36rem;
@@ -388,15 +394,235 @@ main,
   letter-spacing: -0.01em;
 }
 
-/* Le logo : une fin de ligne telle qu'on la dessine sur un plan de tram,
-   un trait qui s'arrête sur une barre. */
-.wordmark::before {
+/* ---------- Logo ----------
+   Choisi par thème (`logo` dans js/themes/index.js), dessiné par js/themes/logos.js, dimensionné en
+   em : il suit la taille de .wordmark. Les couleurs viennent des jetons du thème actif. */
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.logo-svg {
+  display: block;
+  width: auto;
+  overflow: visible;
+}
+
+.logo-ink { stroke: var(--ink); }
+.logo-halo { stroke: var(--bg); }
+
+/* T13, Ticket : un titre de transport, encoches sur les côtés, talon prédécoupé avec la fin de ligne. */
+.logo-ticket {
+  font-size: 0.8em;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-radius: 0.12em;
+  padding: 0.24em 0.55em 0.28em 0.7em;
+  -webkit-mask: radial-gradient(circle at 0 50%, transparent 0.2em, #000 0.21em) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 0.2em, #000 0.21em) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle at 0 50%, transparent 0.2em, #000 0.21em) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 50%, transparent 0.2em, #000 0.21em) right / 51% 100% no-repeat;
+}
+
+.logo-stub {
+  display: inline-flex;
+  align-items: center;
+  height: 1em;
+  margin-left: 0.45em;
+  padding-left: 0.4em;
+  border-left: 0.07em dashed currentColor;
+}
+
+.logo-stub svg {
+  height: 0.6em;
+  width: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+/* T10 et H09, Girouette : points lumineux sur un panneau sombre. */
+.logo-panel { fill: var(--logo-panel); }
+.logo-led .on { fill: var(--logo-led); }
+.logo-led .off { fill: var(--logo-led); opacity: 0.12; }
+.logo-led.is-haunted .logo-dots { filter: drop-shadow(0 0 0.06em var(--logo-led)); }
+
+/* H09, la girouette décrochée : penchée sur son crochet de gauche, pendue à des câbles fatigués. */
+.logo-led.is-broken { margin-top: -0.2em; }
+.logo-sign { transform-box: view-box; transform: rotate(3.5deg); }
+.logo-rim { stroke: #2B2238; stroke-width: 0.5; }
+.logo-rust { fill: #7A3B12; opacity: 0.4; }
+.logo-crack { stroke: #000; stroke-width: 0.25; opacity: 0.7; }
+.logo-cable { stroke: #6D5F80; stroke-width: 0.55; }
+.logo-strand { stroke: #A08A6A; stroke-width: 0.25; }
+.logo-hook { fill: var(--logo-panel); stroke: #8C7BA3; stroke-width: 0.35; }
+.logo-tape { fill: #3A2F48; stroke: #8C7BA3; stroke-width: 0.15; }
+.logo-spark { transform-box: view-box; opacity: 0; stroke: #FFE9A8; stroke-width: 0.3; fill: #FFF6D5; }
+
+/* T06, Pastilles de ligne ; T11, Palettes : une lettre par case, la dernière en couleur. */
+.logo-badges,
+.logo-flap {
+  gap: 0.07em;
+}
+
+.logo-badges > span,
+.logo-flap > span {
+  display: grid;
+  place-items: center;
+}
+
+.logo-badges > span {
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 50%;
+  color: var(--bg);
+  background: var(--ink);
+}
+
+.logo-badges > span:last-child {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.logo-badges b { font-size: 0.56em; }
+
+.logo-flap > span {
+  position: relative;
+  width: 0.72em;
+  height: 1.06em;
+  border-radius: 0.1em;
+  color: var(--logo-flap);
+  background: var(--logo-panel);
+}
+
+.logo-flap > span:last-child { color: var(--logo-led); }
+
+.logo-flap > span::after {
   content: "";
-  width: 1.1em;
-  height: 0.75em;
-  background: linear-gradient(var(--accent), var(--accent)) left center / 100% 0.2em no-repeat;
-  border-right: 0.22em solid var(--accent);
-  border-radius: 0 0.08em 0.08em 0;
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 0.045em;
+  background: rgb(0 0 0 / 0.6);
+}
+
+.logo-flap b { font-size: 0.68em; }
+
+/* T07, Pastille T : la première lettre dans une pastille de ligne. */
+.logo-pt {
+  display: grid;
+  place-items: center;
+  width: 1.08em;
+  height: 1.08em;
+  margin-right: 0.05em;
+  border-radius: 50%;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.logo-pt b { font-size: 0.7em; }
+
+/* T08, Point en direct : le point du i est celui du temps réel. */
+.logo-i {
+  position: relative;
+}
+
+.logo-live {
+  position: absolute;
+  left: 50%;
+  top: 0.07em;
+  width: 0.2em;
+  height: 0.2em;
+  margin-left: -0.1em;
+  border-radius: 50%;
+  background: var(--live-dot);
+}
+
+/* T09, Point final. */
+.logo-stop {
+  align-self: flex-end;
+  width: 0.21em;
+  height: 0.21em;
+  margin: 0 0 0.12em 0.05em;
+  background: var(--accent);
+}
+
+/* T12, Plaque de station : bandeau de couleur de la ligne en haut. */
+.logo-plate {
+  font-size: 0.64em;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-top: 0.22em solid var(--accent);
+  border-radius: 0.24em;
+  padding: 0.24em 0.6em 0.26em;
+  box-shadow: 0 0.06em 0.2em rgb(0 0 0 / 0.1);
+}
+
+/* H10, Pleine lune ; H11, Bougie. */
+.logo-fullmoon { fill: var(--logo-moon); }
+.logo-craters { fill: #D9C48F; opacity: 0.55; }
+.logo-bat { fill: var(--ink); }
+.logo-glow { fill: var(--accent); opacity: 0.18; }
+.logo-candle { fill: var(--ink); }
+.logo-wick { stroke: var(--muted); stroke-width: 0.4; }
+.logo-flame { fill: var(--accent); }
+.logo-flame-core { fill: #FFD36B; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo-led.is-haunted .on.l2 { animation: logo-flicker 2.8s steps(1) infinite; }
+  .logo-sign { animation: logo-swing 3.6s ease-in-out infinite alternate; }
+  .logo-spark.is-first { animation: logo-spark 5.3s linear infinite; }
+  .logo-spark.is-second { animation: logo-spark 7.9s linear -3.1s infinite; }
+  .logo-led.is-broken .logo-dots { animation: logo-short 5.3s steps(1) infinite; }
+  .logo-led.is-haunted .on.l6 { animation: logo-flicker 3.6s steps(1) -1.2s infinite; }
+  .logo-live { animation: logo-pulse 1.6s ease-out infinite; }
+  .logo-flame { transform-box: fill-box; transform-origin: 50% 100%; animation: logo-flame 1.3s ease-in-out infinite; }
+}
+
+@keyframes logo-flicker {
+  0%, 11%, 57% { opacity: 1; }
+  8% { opacity: 0.12; }
+  54% { opacity: 0.2; }
+}
+
+@keyframes logo-swing {
+  from { transform: rotate(2.8deg); }
+  to { transform: rotate(4.4deg); }
+}
+
+/* Une gerbe brève, au même moment que la baisse de l'affichage (logo-short, même durée). */
+@keyframes logo-spark {
+  0%, 87%, 100% { opacity: 0; transform: scale(0.4); }
+  88% { opacity: 1; transform: scale(1.3); }
+  90% { opacity: 0.2; transform: scale(0.8); }
+  91% { opacity: 1; transform: scale(1.1); }
+  94% { opacity: 0; transform: scale(1.5); }
+}
+
+@keyframes logo-short {
+  0%, 94% { opacity: 1; }
+  88% { opacity: 0.35; }
+  90% { opacity: 0.9; }
+  91% { opacity: 0.25; }
+  92% { opacity: 0.7; }
+}
+
+@keyframes logo-pulse {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live-dot) 60%, transparent); }
+  to { box-shadow: 0 0 0 0.32em transparent; }
+}
+
+@keyframes logo-flame {
+  0%, 100% { transform: scale(1, 1) rotate(0deg); }
+  25% { transform: scale(0.92, 1.08) rotate(-4deg); }
+  50% { transform: scale(1.05, 0.94) rotate(3deg); }
+  75% { transform: scale(0.96, 1.05) rotate(-2deg); }
 }
 
 /* Sélecteurs de ville et d'information, en haut à droite. */

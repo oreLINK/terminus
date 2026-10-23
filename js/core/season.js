@@ -4,6 +4,7 @@
 // dite même si la page reste ouverte. L'horloge est celle du site (mode test compris).
 
 import { activeTheme, DEFAULT_THEME } from "../themes/index.js";
+import { logoHtml } from "../themes/logos.js";
 import { now } from "./lab.js";
 import { paintBar } from "./ambient.js";
 
@@ -30,6 +31,7 @@ function apply() {
   link?.remove();
   link = null;
   current = theme;
+  paintLogo(theme.logo ?? DEFAULT_THEME.logo);
 
   const html = document.documentElement;
   if (theme === DEFAULT_THEME) {
@@ -52,6 +54,12 @@ function apply() {
       stopDecorations = mod.start({ theme, now });
     })
     .catch(() => {}); // sans animations, le thème reste : couleurs et décor fixe
+}
+
+// Logo du thème dans l'en-tête. Au chargement, celui du thème par défaut est déjà dans index.html.
+function paintLogo(id) {
+  const mark = document.querySelector(".wordmark");
+  if (mark) mark.innerHTML = logoHtml(id);
 }
 
 // Texte du thème en cours pour `key`, sinon `fallback`. `{nom}` est remplacé par vars.nom.

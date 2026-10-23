@@ -62,3 +62,18 @@ test("THEMES.md et js/themes/index.js donnent le même calendrier", () => {
   }
   assert.ok(rows.some((r) => r.id === DEFAULT_THEME.id), "le thème Terminus figure au calendrier");
 });
+
+test("logo : chaque thème en a un du catalogue, et les pages affichent celui du thème par défaut sans script", async () => {
+  const { LOGOS, logoHtml } = await import("../js/themes/logos.js");
+  assert.ok(LOGOS[DEFAULT_THEME.logo], `logo du thème par défaut inconnu : ${DEFAULT_THEME.logo}`);
+  for (const t of THEMES) if (t.logo) assert.ok(LOGOS[t.logo], `${t.id} : logo inconnu ${t.logo}`);
+  for (const [id, l] of Object.entries(LOGOS)) {
+    const html = l.html();
+    assert.match(html, /aria-label="Terminus"/, `${id} : lu « Terminus » par les lecteurs d'écran`);
+    assert.doesNotMatch(html, /undefined|NaN/, id);
+  }
+  for (const page of ["index.html", "mentions-legales.html", "confidentialite.html"]) {
+    const src = readFileSync(new URL(`../${page}`, import.meta.url), "utf8");
+    assert.ok(src.includes(logoHtml(DEFAULT_THEME.logo)), `${page} : recopier logoHtml("${DEFAULT_THEME.logo}") dans .wordmark`);
+  }
+});
