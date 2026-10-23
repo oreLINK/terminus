@@ -36,7 +36,7 @@ Si votre position est inconnue (localisation refusée ou introuvable), le compte
 **Le compte à rebours**
 
 - Le temps qu'il vous reste avant de partir à pied, calculé sur le tram (ou le bus de nuit) que vous pouvez rejoindre et qui vous amène à destination, avec 2 minutes de marge sur la marche.
-- Avec une correspondance, Terminus indique la station où changer et l'heure du second tram, en comptant 2 minutes pour changer de quai. Tout le trajet se fait dans la même soirée : jamais un tram du lendemain matin pour le finir.
+- Avec une correspondance, Terminus indique la station où changer et l'heure du second tram, en comptant 2 minutes pour changer de quai, ou la marche jusqu'à un arrêt proche quand il faut changer d'arrêt. Tout le trajet se fait dans la même soirée : jamais un tram du lendemain matin pour le finir.
 - La source de l'horaire : estimé sur l'horaire prévu, ou « Temps réel », signalé par un point rouge qui clignote, dès qu'il est disponible.
 - Sa couleur, qui teinte tout l'écran : vert quand vous avez le temps, orange sous 20 minutes, rouge sous 10 minutes, noir quand il est trop tard, gris tant qu'il manque votre position ou votre destination.
 
@@ -159,7 +159,7 @@ Pour celles et ceux dont le logement n'est desservi que par le bus, ou par le bu
 
 ## À savoir
 
-- Les trajets sont directs ou avec une ou deux correspondances, dans une même station.
+- Les trajets sont directs ou avec une ou deux correspondances, dans une même station ou entre deux arrêts proches, quelques minutes à pied (par exemple de Sainte-Catherine à Musée d'Aquitaine). La marche entre les deux est calculée par les rues, avec 2 minutes de marge.
 - Les temps de marche suivent les rues, d'après le calcul d'itinéraire de l'IGN, à environ 4,7 km/h. Juste après l'ouverture, ou si ce calcul ne répond pas, ce sont des estimations, corrigées dès que possible : l'heure limite peut alors bouger d'une ou deux minutes.
 - Le temps réel n'est pas toujours disponible. Les départs éloignés dans le temps peuvent être des horaires prévus.
 - Les travaux programmés sont pris en compte quand ils figurent dans les horaires publiés par le réseau. Les messages de perturbation ne sont pas encore affichés.

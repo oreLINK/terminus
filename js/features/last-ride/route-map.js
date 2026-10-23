@@ -113,6 +113,10 @@ export function createRouteMap({ lineColor, icons, interactive = false, loadShap
     // proche, d'où les deux bouts ajoutés), sinon en ligne droite.
     const walkPoints = (walk, a, b) => [ll(a), ...(walk?.path ?? []), ll(b)];
     const walks = [walkPoints(option.origin.walk, here, legs[0].from)];
+    // Correspondances à pied entre deux stations : par les rues si le tracé est connu.
+    legs.forEach((leg, i) => {
+      if (leg.walkAfter && legs[i + 1]) walks.push(walkPoints(leg.walkAfter, leg.to, legs[i + 1].from));
+    });
     if (!zone) walks.push(walkPoints(option.last.dest.walk, final.to, home));
     for (const points of walks) L.polyline(points, { className: "map-walk", interactive: false }).addTo(layer);
 
@@ -146,7 +150,10 @@ export function createRouteMap({ lineColor, icons, interactive = false, loadShap
       }
       marker.addTo(layer);
     };
-    for (const leg of legs) stop(leg.from, leg.lineCode);
+    for (const leg of legs) {
+      stop(leg.from, leg.lineCode);
+      if (leg.walkAfter) stop(leg.to, leg.lineCode); // descente avant une correspondance à pied
+    }
     stop(final.to, final.lineCode);
 
     const size = interactive ? 30 : 24;

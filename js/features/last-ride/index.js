@@ -1,11 +1,12 @@
 // Mode « Le dernier tram » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, serviceMorning, addDays, communeOf, zoneDests, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, candidateStations, transferMap, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, serviceMorning, addDays, communeOf, zoneDests, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc, distanceM } from "../../core/util.js";
 import { fetchWalk, realWalk } from "../../core/walk-route.js";
 import { eveningJourneys, mergeLive, isoDate } from "../../core/timetable.js";
+import { decodeLine } from "../../core/line-trace.js";
 import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
 import { setComputing } from "../../core/computing.js";
@@ -74,6 +75,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
     home: getHome(network),
     index: null,
     graph: undefined, // graphe du réseau : undefined tant qu'il n'est pas chargé, null s'il n'y en a pas
+    transfers: null, // correspondances à pied entre stations proches (transferMap), chargées avec les arrêts
     lineCodes: {},
     timer: null,
     busy: false,
@@ -282,9 +284,11 @@ export function mount({ root, network, adapter, goal = "last" }) {
 
   async function ensureStops() {
     if (state.index) return;
-    const data = await adapter.loadStops();
+    const [data, transfers] = await Promise.all([adapter.loadStops(), adapter.loadTransfers?.().catch(() => null)]);
     state.index = buildIndex(data.stops);
     state.lineCodes = Object.fromEntries(Object.values(data.lines).map((l) => [l.ref, l.code]));
+    // Sans fichier de correspondances, on change seulement dans une même station, comme avant.
+    state.transfers = transferMap(transfers?.rows, state.index, decodeLine);
   }
 
   // Graphe du réseau (ordre des arrêts par ligne et par sens), chargé une fois. Absent ou en
@@ -306,7 +310,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
   function loadStages(origins, dests) {
     const all = bothWays(Object.keys(state.lineCodes));
     if (!state.graph) return [bothWays(candidateLines(origins, dests)), all];
-    const args = { graph: state.graph, index: state.index, origins, dests };
+    const args = { graph: state.graph, index: state.index, origins, dests, transfers: state.transfers };
     return [routeRequests(args), routeRequests({ ...args, extraTransfers: 1 }), all];
   }
 
@@ -349,7 +353,8 @@ export function mount({ root, network, adapter, goal = "last" }) {
         return renderAtHome();
       }
 
-      const origins = withRealWalks(nearestStations(state.index.stations, here, { radius: 2000, min: 2, max: 8 }), "origins", here);
+      // Candidats ligne par ligne : la station la plus proche de chaque ligne, plus les plus proches.
+      const origins = withRealWalks(candidateStations(state.index.stations, here, { radius: 2000, min: 2, max: 10 }), "origins", here);
       // Zones à la demande (TBNight) : si le domicile est dans une commune de zone, le dernier arrêt
       // fixe de la ligne y mène sans marche (on reste dans le bus), même s'il est aussi à portée à pied.
       const zones = zoneDests({
@@ -359,7 +364,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
         index: state.index,
         lineCodes: state.lineCodes,
       });
-      const near = withRealWalks(nearestStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 5 }), "dests", state.home);
+      const near = withRealWalks(candidateStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 8 }), "dests", state.home);
       const dests = [...near.filter((d) => !zones.some((z) => z.station.id === d.station.id)), ...zones];
       const loaded = new Set();
       let journeys = [];
@@ -388,7 +393,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
         journeys = journeys.concat(got.journeys);
         failed += got.failed;
         now = clockNow();
-        result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd, serviceGap });
+        result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd, serviceGap, transfers: state.transfers });
         if (result.options.length) break;
       }
       // Avec les horaires théoriques, les courses passées sont connues : le calcul voit seul que le
@@ -430,7 +435,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
     }
     if (!journeys) return null;
     const run = () =>
-      plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now: clockNow(), serviceEnd, serviceGap });
+      plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now: clockNow(), serviceEnd, serviceGap, transfers: state.transfers });
     let result = run();
     let failed = 0;
     const asked = new Set();
@@ -498,7 +503,14 @@ export function mount({ root, network, adapter, goal = "last" }) {
   // calcul avec les horaires déjà chargés : l'heure limite, le choix de l'arrêt et la carte suivent
   // les rues. Pendant ce temps, l'estimation reste affichée ; un échec la garde.
   async function refineWalks(here) {
-    const { origins = [], dests = [] } = state.last ?? {};
+    // Seulement les stations qu'un trajet emprunte vraiment : ni l'IGN ni le téléphone ne travaillent
+    // pour un arrêt sans tram utile (avec les candidats ligne par ligne, il y en a davantage).
+    const { origins: allOrigins = [], dests: allDests = [], result } = state.last ?? {};
+    const options = result?.options ?? [];
+    const usedOrigins = new Set(options.map((o) => o.origin.station.id));
+    const usedDests = new Set(options.flatMap((o) => o.catchable.map((t) => t.dest.station.id)));
+    const origins = allOrigins.filter((o) => usedOrigins.has(o.station.id));
+    const dests = allDests.filter((d) => usedDests.has(d.station.id));
     const jobs = [];
     const ask = (side, from, item, a, b) => {
       const known = walksFor(side, from);
@@ -535,6 +547,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
       now,
       serviceEnd: last.serviceEnd,
       serviceGap,
+      transfers: state.transfers,
     });
     keep({ ...last, result: settle(result, last.overHint), origins, dests, now });
     renderLast();
@@ -589,7 +602,28 @@ export function mount({ root, network, adapter, goal = "last" }) {
       }),
     ];
     legs.forEach((leg, i) => {
-      const before = i === 0 ? "walk" : legs[i - 1].lineCode;
+      const prev = legs[i - 1];
+      // Correspondance à pied : descente à la station du tronçon précédent, puis marche jusqu'à
+      // celle-ci (distance par les rues, calculée à la génération).
+      if (prev?.walkAfter) {
+        steps.push(
+          step({
+            time: clock(prev.arr),
+            top: prev.lineCode,
+            bottom: "walk",
+            dot: "is-stop",
+            dotLine: prev.lineCode,
+            body: `<strong class="route-stop">${esc(prev.to.name)}</strong>`,
+          }),
+          step({
+            top: "walk",
+            bottom: "walk",
+            kind: "ride",
+            body: `À pied, ${Math.max(1, Math.ceil(prev.walkAfter.seconds / 60))} min jusqu'à ${esc(leg.from.name)}`,
+          }),
+        );
+      }
+      const before = i === 0 || prev.walkAfter ? "walk" : prev.lineCode;
       const note = i === 0 ? "" : `<span class="route-note">correspondance</span>`;
       const name = `<strong class="route-stop">${esc(leg.from.name)}</strong>`;
       steps.push(

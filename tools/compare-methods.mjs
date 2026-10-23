@@ -13,7 +13,8 @@
 import tbm from "../js/networks/bordeaux-tbm/index.js";
 import stopsData from "../js/networks/bordeaux-tbm/stops.js";
 import { loadTimetable } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, nearestStations, plan, serviceEndAfter, serviceMorning, addDays } from "../js/features/last-ride/planner.js";
+import { buildIndex, candidateStations, transferMap, plan, serviceEndAfter, serviceMorning, addDays } from "../js/features/last-ride/planner.js";
+import { decodeLine } from "../js/core/line-trace.js";
 import { eveningJourneys, isoDate } from "../js/core/timetable.js";
 import { zonedTime } from "../js/core/util.js";
 
@@ -30,6 +31,8 @@ const tz = tbm.timeZone;
 const lines = Object.keys(stopsData.lines);
 const lineCodes = Object.fromEntries(Object.values(stopsData.lines).map((l) => [l.ref, l.code]));
 const index = buildIndex(stopsData.stops);
+// Comme dans l'appli : correspondances à pied et candidats ligne par ligne.
+const transfers = transferMap((await adapter.loadTransfers()).rows, index, decodeLine);
 const now = Date.now();
 const serviceEnd = serviceEndAfter(now, { timeZone: tz, hour: adapter.serviceEndHour });
 const fmt = (ms) => new Intl.DateTimeFormat("fr-FR", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(ms);
@@ -43,6 +46,9 @@ for (const line of lines) {
     live.push(...got.map((j) => ({ ...j, direction })));
   }
 }
+// Les annulations explicites du flux ne roulent pas : comptées à part, hors des comparaisons.
+const cancellations = live.filter((j) => j.cancelled);
+live.splice(0, live.length, ...live.filter((j) => !j.cancelled));
 const evening = addDays(serviceMorning(now, { timeZone: tz, hour: adapter.serviceEndHour }), -1);
 const theo = await eveningJourneys(adapter.evening, [isoDate(evening), isoDate(addDays(evening, 1))], new Set(lines));
 if (!theo) throw new Error("Les horaires inclus ne couvrent pas cette soirée : npm run timetable.");
@@ -57,7 +63,7 @@ const horizon = Math.min(serviceEnd, ...horizonOf.values());
 // Les horaires inclus couvrent la soirée à partir de 17 h : en journée, on compare comme s'il était 17 h.
 const since = Math.max(now, zonedTime(`${isoDate(evening)} 17:00`, tz));
 console.log(`Soirée du ${isoDate(evening)}, comparaison de ${fmt(since)} à ${fmt(horizon)} (fin du service ${fmt(serviceEnd)}).`);
-console.log(`Courses : ${live.length} dans SIRI, ${theo.length} dans les horaires inclus.\n`);
+console.log(`Courses : ${live.length} dans SIRI (et ${cancellations.length} annulations), ${theo.length} dans les horaires inclus.\n`);
 
 // ---------- 1. Les données ----------
 
@@ -131,6 +137,7 @@ const staleIds = new Set(staleInLive.map((j) => j.id));
 const usesStale = (o) => o?.last.legs.some((l) => staleIds.has(l.journeyId));
 const details = [];
 let tested = 0;
+let walkingTransfers = 0;
 while (tested < PAIRS) {
   const a = pick();
   const b = pick();
@@ -138,14 +145,15 @@ while (tested < PAIRS) {
   tested++;
   const here = jitter(a);
   const home = jitter(b);
-  const origins = nearestStations(index.stations, here, { radius: 2000, min: 2, max: 8 });
-  const dests = nearestStations(index.stations, home, { radius: 1500, min: 1, max: 5 });
-  const run = (journeys) => plan({ origins, dests, journeys, index, lineCodes, now: since, serviceEnd: horizon });
+  const origins = candidateStations(index.stations, here, { radius: 2000, min: 2, max: 10 });
+  const dests = candidateStations(index.stations, home, { radius: 1500, min: 1, max: 8 });
+  const run = (journeys) => plan({ origins, dests, journeys, index, lineCodes, now: since, serviceEnd: horizon, transfers });
   const old = run(live);
   const fresh = run(theo);
   for (const kind of ["primary", "soonest"]) {
     const x = old[kind];
     const y = fresh[kind];
+    if (y?.last.legs.some((l) => l.walkAfter)) walkingTransfers++;
     if (!x && !y) {
       tally.none++;
       continue;
@@ -169,4 +177,5 @@ console.log(`  Mêmes courses, heure différente (temps réel) : ${tally.delay}`
 console.log(`  SIRI s'appuie sur une course fantôme (absente du GTFS ce soir, jamais suivie) : ${tally.phantom}`);
 console.log(`  Les horaires inclus trouvent une course que SIRI n'a qu'à la date de la veille : ${tally.stale}`);
 console.log(`  Autres écarts, à examiner : ${tally.different}${tally.none ? ` ; sans trajet dans les deux : ${tally.none}` : ""}`);
+console.log(`  Tracés avec une correspondance à pied (horaires inclus) : ${walkingTransfers}`);
 for (const d of details.slice(0, 8)) console.log(d);

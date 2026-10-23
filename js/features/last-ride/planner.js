@@ -1,7 +1,7 @@
 // Calcul du trajet en tram entre la position actuelle et le domicile, avec ou sans correspondance.
 // Fonctions pures : aucune dépendance au DOM ni au réseau, testables avec Node.
 
-import { distanceM, walkBetween } from "../../core/util.js";
+import { distanceM, walkBetween, walkSeconds } from "../../core/util.js";
 
 export const normName = (s) =>
   String(s)
@@ -79,6 +79,45 @@ export function nearestStations(stations, point, { radius, min, max }) {
   return inRadius.length >= min ? inRadius : sorted.slice(0, min);
 }
 
+// Stations candidates autour d'un point, ligne par ligne : pour chaque ligne, la station la plus
+// proche qui la dessert dans le rayon, plus les `min` stations les plus proches quelle que soit leur
+// ligne ; au plus `max`, les plus proches d'abord. Sans cela, les 8 stations les plus proches seraient
+// toutes sur une même ligne dense (le bus, demain) et masqueraient une autre ligne un peu plus loin.
+export function candidateStations(stations, point, { radius, min, max }) {
+  const sorted = stations
+    .map((station) => ({ station, walk: walkBetween(point, station) }))
+    .sort((a, b) => a.walk.straight - b.walk.straight);
+  const kept = new Set(sorted.slice(0, min));
+  const covered = new Set();
+  for (const x of sorted) {
+    if (x.walk.straight > radius) break;
+    if (x.station.lines.some((l) => !covered.has(l))) {
+      kept.add(x);
+      x.station.lines.forEach((l) => covered.add(l));
+    }
+  }
+  return sorted.filter((x) => kept.has(x)).slice(0, max);
+}
+
+// Correspondances à pied entre stations proches de noms différents, calculées à la génération
+// (tools/build-transfers.mjs) : [idA, idB, mètres, tracé encodé ou null] → Map station id → [{ to,
+// meters, seconds, path }], dans les deux sens. Les identifiants inconnus de l'index sont ignorés.
+export function transferMap(rows, index, decode = null) {
+  const known = new Set(index.stations.map((s) => s.id));
+  const map = new Map();
+  const add = (from, to, meters, path) => {
+    if (!map.has(from)) map.set(from, []);
+    map.get(from).push({ to, meters, seconds: walkSeconds(meters), path });
+  };
+  for (const [a, b, meters, encoded] of rows ?? []) {
+    if (!known.has(a) || !known.has(b)) continue;
+    const path = encoded && decode ? decode(encoded) : null;
+    add(a, b, meters, path);
+    add(b, a, meters, path ? [...path].reverse() : null);
+  }
+  return map;
+}
+
 // Lignes à charger : toutes celles des stations des deux côtés. Elles suffisent pour un trajet
 // direct ou à une correspondance ; au-delà, l'appelant charge les autres lignes (voir index.js).
 export function candidateLines(origins, dests) {
@@ -103,7 +142,7 @@ export const TRANSFER_PENALTY_MS = 10 * MIN;
 // correspondances de plus que le trajet le plus simple, dans la limite de `maxTransfers`.
 // Mesuré sur le réseau TBM : avec 0, 1 à 4 appels ; avec 1, 8 à 11, presque tout le réseau.
 // Tableau vide si le graphe ne relie pas les deux côtés : l'appelant charge alors sans graphe.
-export function routeRequests({ graph, index, origins, dests, maxTransfers = MAX_TRANSFERS, extraTransfers = 0 }) {
+export function routeRequests({ graph, index, origins, dests, maxTransfers = MAX_TRANSFERS, extraTransfers = 0, transfers = null }) {
   const seqs = graph.patterns.map((p) => ({
     line: p.line,
     direction: p.direction,
@@ -112,8 +151,8 @@ export function routeRequests({ graph, index, origins, dests, maxTransfers = MAX
       .filter(Boolean),
   }));
   const maxLegs = maxTransfers + 1;
-  const fwd = legsFrom(seqs, origins, maxLegs, false);
-  const bwd = legsFrom(seqs, dests, maxLegs, true);
+  const fwd = legsFrom(seqs, origins, maxLegs, false, transfers);
+  const bwd = legsFrom(seqs, dests, maxLegs, true, transfers);
 
   // Pour chaque motif, le trajet le plus court qui l'emprunte : monter en i, descendre en j > i.
   const best = seqs.map(({ stations }) => {
@@ -137,10 +176,20 @@ export function routeRequests({ graph, index, origins, dests, maxTransfers = MAX
 }
 
 // Nombre minimal de tronçons en tram pour atteindre chaque station depuis `sources`
-// (0 pour elles), ou pour rejoindre `sources` à rebours. Au plus `maxLegs`.
-function legsFrom(seqs, sources, maxLegs, reverse) {
+// (0 pour elles), ou pour rejoindre `sources` à rebours. Au plus `maxLegs`. Une correspondance à pied
+// (`transfers`, symétrique) mène à une station voisine sans tronçon de plus.
+function legsFrom(seqs, sources, maxLegs, reverse, transfers = null) {
   const legs = new Map(sources.map((s) => [s.station.id, 0]));
+  const walk = () => {
+    if (!transfers) return;
+    for (const [from, list] of transfers) {
+      const here = legs.get(from);
+      if (here == null) continue;
+      for (const { to } of list) if ((legs.get(to) ?? Infinity) > here) legs.set(to, here);
+    }
+  };
   for (let round = 0; round < maxLegs; round++) {
+    walk();
     for (const { stations } of seqs) {
       let boardMin = Infinity;
       const order = reverse ? [...stations].reverse() : stations;
@@ -162,8 +211,9 @@ function legsFrom(seqs, sources, maxLegs, reverse) {
 // heure donnée est donc aussi celui qui arrive le plus tôt.
 // Aucune montée à partir de `serviceEnd` : chaque tronçon, correspondances comprises, reste dans
 // la même journée de service (jamais un tram du lendemain matin pour finir le trajet).
-function buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd }) {
-  const runs = journeys.map((j) => ({ j, stations: j.calls.map((c) => index.stationFor(c)) }));
+function buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd, transfers }) {
+  // Les courses annulées (gardées par le flux pour la fusion avec les horaires théoriques) ne roulent pas.
+  const runs = journeys.filter((j) => !j.cancelled).map((j) => ({ j, stations: j.calls.map((c) => index.stationFor(c)) }));
   const profiles = [];
 
   for (let k = 0; k <= maxTransfers; k++) {
@@ -199,13 +249,17 @@ function buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd }) 
               run,
               fromIndex: i,
               toIndex: best.index,
+              // Marche jusqu'à la station du tronçon suivant (correspondance à pied), sinon null.
+              walkAfter: best.walk ?? null,
             },
             next: best.next,
           });
         }
 
-        const here = k === 0 ? alightHome(st, call, i, destById) : alightTransfer(st, call, i, j, prev);
-        if (here && (!best || here.arrHome < best.arrHome)) best = here;
+        const here = k === 0 ? alightHome(st, call, i, destById) : alightTransfer(st, call, i, j, prev, transfers);
+        // À arrivée égale, la descente qui fait le moins marcher : rester dans le tram jusqu'à la
+        // station de correspondance plutôt que descendre plus loin et revenir à pied.
+        if (here && (!best || here.arrHome < best.arrHome || (here.arrHome === best.arrHome && walkCost(here) < walkCost(best)))) best = here;
       }
     }
 
@@ -221,11 +275,21 @@ function alightHome(station, call, index, destById) {
   return dest ? { station, call, index, dest, next: null, arrHome: call.arr + dest.walk.minutes * MIN } : null;
 }
 
-// Descente pour une correspondance : le premier départ utile après le changement de quai.
-function alightTransfer(station, call, index, journey, prev) {
-  const next = firstFrom(prev.get(station.id), call.arr + TRANSFER_MS, journey.id);
-  return next ? { station, call, index, dest: next.dest, next, arrHome: next.arrHome } : null;
+// Descente pour une correspondance : dans la même station, le premier départ utile après le
+// changement de quai ; ou, à pied jusqu'à une station voisine (`transfers`), le premier départ
+// après la marche et la même marge. On garde celle qui ramène le plus tôt ; `walk` dit la marche.
+function alightTransfer(station, call, index, journey, prev, transfers) {
+  let best = null;
+  const tryFrom = (stationId, readyAt, walk) => {
+    const next = firstFrom(prev.get(stationId), readyAt, journey.id);
+    if (next && (!best || next.arrHome < best.arrHome)) best = { station, call, index, dest: next.dest, next, arrHome: next.arrHome, walk };
+  };
+  tryFrom(station.id, call.arr + TRANSFER_MS, null);
+  for (const w of transfers?.get(station.id) ?? []) tryFrom(w.to, call.arr + w.seconds * 1000 + TRANSFER_MS, w);
+  return best;
 }
+
+const walkCost = (alight) => alight.walk?.seconds ?? 0;
 
 function frontier(entries) {
   entries.sort((a, b) => b.dep - a.dep || a.arrHome - b.arrHome);
@@ -346,6 +410,23 @@ export function inServiceWindow(now, { timeZone, startHour, endHour }) {
   return serviceEndAfter(now, { timeZone, hour: endHour }) < serviceEndAfter(now, { timeZone, hour: startHour });
 }
 
+// Un trajet qui repasse par une station déjà visitée (partir de Hôtel de Ville pour y revenir par
+// une autre ligne, gagner quelques minutes de départ par une boucle) n'a pas de sens : on l'écarte.
+// Une correspondance dans la même station (descente et montée au même endroit) n'est pas une boucle.
+function loops(trip) {
+  const seen = new Set();
+  let last = null;
+  for (const leg of trip.legs) {
+    for (const id of [leg.from.id, leg.to.id]) {
+      if (id === last) continue;
+      if (seen.has(id)) return true;
+      seen.add(id);
+      last = id;
+    }
+  }
+  return false;
+}
+
 // Trajet complet à partir d'un départ du profil. Les champs du premier tronçon restent à la
 // racine (dep, lineCode…) : c'est le tram à prendre depuis l'arrêt de départ.
 // Chaque tronçon a son `path` : les positions des arrêts parcourus, de la montée à la descente.
@@ -383,9 +464,10 @@ function itinerary(entry, lineCodes, index) {
 // `serviceEnd` : fin du service en cours (serviceEndAfter) ; aucun tronçon ne part après elle.
 // `serviceGap` : au-delà de cet écart avant le prochain départ, la journée est finie (statut
 // `ended`). Infinity pour le prochain bus de nuit, qui peut passer plusieurs heures plus tard.
-export function plan({ origins, dests, journeys, index, lineCodes, now, serviceEnd = Infinity, serviceGap = SERVICE_GAP_MS, maxTransfers = MAX_TRANSFERS }) {
+// `transfers` : correspondances à pied (transferMap), facultatives.
+export function plan({ origins, dests, journeys, index, lineCodes, now, serviceEnd = Infinity, serviceGap = SERVICE_GAP_MS, maxTransfers = MAX_TRANSFERS, transfers = null }) {
   const destById = new Map(dests.map((d) => [d.station.id, d]));
-  const profiles = buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd });
+  const profiles = buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd, transfers });
 
   const found = [];
   let upcoming = false; // des trams restent, rejoignables ou non
@@ -398,7 +480,10 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
       const future = entries.filter((e) => e.dep >= now - MIN);
       if (entries.some((e) => e.dep < now - MIN)) servedEarlier = true;
       if (future.length) upcoming = true;
-      const catchable = future.filter((e) => e.dep >= now + walkToMs).map((e) => itinerary(e, lineCodes, index));
+      const catchable = future
+        .filter((e) => e.dep >= now + walkToMs)
+        .map((e) => itinerary(e, lineCodes, index))
+        .filter((t) => !loops(t));
       if (!catchable.length) return;
       const next = catchable[0];
       const last = catchable[catchable.length - 1];

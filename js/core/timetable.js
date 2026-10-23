@@ -42,27 +42,47 @@ export async function eveningJourneys(source, dates, lines = null) {
   return out;
 }
 
-// Remplace, pour chaque (ligne, sens) interrogé en temps réel, les courses théoriques que le flux
-// couvre par celles du flux. Une course théorique absente du flux dans sa fenêtre est tenue pour
-// supprimée (le flux omet les courses supprimées). Au-delà de la dernière course du flux (horizon
-// du flux), les courses théoriques restent. Un flux vide pour un (ligne, sens) ne prouve rien (panne,
-// fin de service) : les courses théoriques restent.
+// Applique le temps réel des (ligne, sens) interrogés aux courses théoriques. Le temps réel corrige
+// ou annule, mais une absence ne prouve rien : le flux SIRI de TBM omet des courses bien réelles
+// (constaté le 23/10/2026 : les courses d'après minuit d'un soir, dont il ne garde que celles de la
+// veille, l'identifiant d'une course de semaine se répétant chaque jour) et en publie de fantômes
+// (courses d'un autre jour, sans aucun suivi en direct). Donc :
+//   - une course du flux remplace sa jumelle théorique (même identifiant, à moins de 6 h) ;
+//   - une course annulée du flux retire sa jumelle (la plus proche dans le temps, si elle n'a pas
+//     d'heure) ;
+//   - une course du flux sans jumelle n'est ajoutée que si elle est suivie en direct (renfort réel) :
+//     sans suivi, c'est un fantôme probable ;
+//   - une course théorique sans jumelle dans le flux reste.
+// Un second appel pour les mêmes (ligne, sens) remplace le temps réel du premier (la jumelle peut
+// être une course déjà corrigée). `requests` dit les (ligne, sens) interrogés : seules leurs courses
+// peuvent être remplacées ou retirées.
 export function mergeLive(journeys, requests, live) {
-  const key = (line, direction) => `${line}|${direction}`;
-  const horizon = new Map();
+  const key = (j) => `${j.line}|${j.direction}`;
+  const asked = new Set(requests.map((r) => `${r.line}|${r.direction}`));
+  const SAME_DAY_MS = 6 * 3600 * 1000;
+  const first = (j) => j.calls[0]?.dep;
+  const out = [...journeys];
+  const byId = new Map();
+  out.forEach((j, i) => byId.set(j.id, [...(byId.get(j.id) ?? []), i]));
+  const twinIndex = (j) => {
+    const candidates = (byId.get(j.id) ?? []).filter((i) => out[i] && asked.has(key(out[i])));
+    if (!candidates.length) return -1;
+    if (first(j) == null) return candidates.sort((a, b) => first(out[a]) - first(out[b]))[0];
+    const near = candidates.filter((i) => Math.abs(first(out[i]) - first(j)) < SAME_DAY_MS);
+    return near.length ? near[0] : -1;
+  };
+  const added = [];
   for (const j of live) {
-    const k = key(j.line, j.direction);
-    const first = j.calls[0].dep;
-    horizon.set(k, Math.max(horizon.get(k) ?? -Infinity, first));
+    const i = twinIndex(j);
+    if (j.cancelled) {
+      if (i >= 0) out[i] = null;
+    } else if (i >= 0) {
+      out[i] = j;
+    } else if (j.calls.some((c) => c.depLive)) {
+      added.push(j);
+    }
   }
-  const asked = new Set(requests.map((r) => key(r.line, r.direction)));
-  const kept = journeys.filter((j) => {
-    const k = key(j.line, j.direction);
-    if (!asked.has(k) || !horizon.has(k)) return true; // pas rafraîchi : inchangé
-    if (!j.theoretical) return false; // ancien temps réel de ce (ligne, sens) : remplacé
-    return j.calls[0].dep > horizon.get(k); // au-delà de l'horizon du flux : gardé
-  });
-  return [...kept, ...live];
+  return [...out.filter(Boolean), ...added];
 }
 
 // Jours de service au format AAAA-MM-JJ.
