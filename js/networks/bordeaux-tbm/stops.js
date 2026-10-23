@@ -1,5 +1,5 @@
 // Généré par tools/build-graph.mjs (npm run graph). Ne pas modifier à la main.
-// Lignes de tram TBM et points d'arrêt (quais) desservis par au moins un tram.
+// Lignes de tram TBM et points d'arrêt (quais) desservis par au moins l'une d'elles.
 
 export default {
   generatedAt: "2026-10-01",

@@ -13,7 +13,13 @@ const { NETWORKS, getNetwork, networkAt } = await import("../js/networks/index.j
 const { FEATURES, DEFAULT_FEATURE, featuresFor } = await import("../js/features/index.js");
 const { getHome, saveHome } = await import("../js/core/home.js");
 
-test("chaque réseau est complet et ne déclare que des types d'information connus", () => {
+// Tous les adaptateurs « dernier trajet » (tram, bus de nuit) : ils partagent l'écran de last-ride.
+const rideAdapters = () =>
+  NETWORKS.flatMap((n) =>
+    ["last-ride", "night-ride"].filter((id) => n.features[id]).map((id) => ({ n, id, a: n.features[id] })),
+  );
+
+test("chaque réseau est complet et ne déclare que des modes connus", () => {
   const known = new Set(FEATURES.map((f) => f.id));
   const ids = new Set();
   for (const n of NETWORKS) {
@@ -27,10 +33,12 @@ test("chaque réseau est complet et ne déclare que des types d'information conn
     assert.ok(n.area.department && n.area.label && n.area.center, n.id);
     assert.ok(Object.keys(n.features).length > 0, `${n.id} ne fournit aucune information`);
     for (const id of Object.keys(n.features)) assert.ok(known.has(id), `${n.id} : type inconnu ${id}`);
+    // Le mode par défaut de la ville est l'un de ceux qu'elle fournit.
+    if (n.defaultFeature) assert.ok(n.features[n.defaultFeature], `${n.id} : mode par défaut ${n.defaultFeature} absent`);
   }
 });
 
-test("chaque type d'information expose son interface", () => {
+test("chaque mode expose son interface", () => {
   assert.ok(FEATURES.some((f) => f.id === DEFAULT_FEATURE));
   for (const f of FEATURES) {
     assert.ok(f.id && f.title && f.short && f.description, f.id);
@@ -38,10 +46,9 @@ test("chaque type d'information expose son interface", () => {
   }
 });
 
-test("l'adaptateur du dernier tram fournit les fonctions attendues", () => {
-  for (const n of NETWORKS) {
-    const a = n.features["last-ride"];
-    if (!a) continue;
+test("les adaptateurs du dernier trajet fournissent les fonctions attendues", () => {
+  for (const { n, a } of rideAdapters()) {
+    if (a.runsOn) assert.equal(typeof a.runsOn, "function", n.id);
     assert.equal(typeof a.loadStops, "function", n.id);
     assert.equal(typeof a.loadTimetable, "function", n.id);
     assert.ok(a.vehicle, n.id);
@@ -65,9 +72,7 @@ test("les arrêts du réseau se chargent sans appel à l'API et sont cohérents"
     throw new Error("appel réseau inattendu");
   };
   try {
-    for (const n of NETWORKS) {
-      const a = n.features["last-ride"];
-      if (!a) continue;
+    for (const { n, a } of rideAdapters()) {
       const { lines, stops } = await a.loadStops();
       assert.ok(Object.keys(lines).length > 0 && stops.length > 0, n.id);
       for (const s of stops) {
@@ -82,10 +87,9 @@ test("les arrêts du réseau se chargent sans appel à l'API et sont cohérents"
   }
 });
 
-test("le graphe du réseau, s'il existe, décrit des lignes de tram connues dans les deux sens", async () => {
-  for (const n of NETWORKS) {
-    const a = n.features["last-ride"];
-    if (!a?.loadGraph) continue;
+test("le graphe du réseau, s'il existe, décrit des lignes connues (le tram dans les deux sens)", async () => {
+  for (const { n, id, a } of rideAdapters()) {
+    if (!a.loadGraph) continue;
     const graph = await a.loadGraph();
     assert.ok(graph.patterns.length > 0, n.id);
     const directions = new Set();
@@ -95,10 +99,24 @@ test("le graphe du réseau, s'il existe, décrit des lignes de tram connues dans
       for (const ref of p.stops) assert.ok(graph.names[ref], `${n.id} : arrêt sans nom ${ref}`);
       directions.add(`${p.line}|${p.direction}`);
     }
-    // Chaque ligne du graphe apparaît dans les deux sens.
+    // Chaque ligne de tram apparaît dans les deux sens ; TBNight N2 à N8 n'en ont qu'un.
+    if (id !== "last-ride") continue;
     for (const key of directions) {
       const [line, dir] = key.split("|");
       assert.ok(directions.has(`${line}|${dir === "0" ? "1" : "0"}`), `${n.id} ${line} : un seul sens`);
+    }
+  }
+});
+
+test("chaque zone à la demande part d'une ligne connue du graphe", async () => {
+  for (const { n, a } of rideAdapters()) {
+    if (!a.zones) continue;
+    const { lines } = await a.loadStops();
+    const graph = await a.loadGraph();
+    const codes = new Set(graph.patterns.map((p) => lines[p.line]?.code));
+    for (const z of a.zones) {
+      assert.ok(codes.has(z.line), `${n.id} : zone sur une ligne inconnue ${z.line}`);
+      assert.ok(z.communes.length > 0, `${n.id} ${z.line}`);
     }
   }
 });
@@ -107,7 +125,7 @@ test("la ville est choisie d'après la position", () => {
   assert.equal(networkAt({ lat: 44.8378, lon: -0.5792 })?.id, "bordeaux-tbm"); // place de la Comédie
   assert.equal(networkAt({ lat: 48.8566, lon: 2.3522 }), null); // Paris : aucun réseau
   assert.equal(networkAt(null), null);
-  assert.deepEqual(featuresFor(getNetwork("bordeaux-tbm")).map((f) => f.id), ["last-ride"]);
+  assert.deepEqual(featuresFor(getNetwork("bordeaux-tbm")).map((f) => f.id), ["last-ride", "night-ride"]);
 });
 
 test("le domicile est rangé par réseau et l'ancienne adresse est reprise", () => {

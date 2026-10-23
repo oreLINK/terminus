@@ -2,38 +2,8 @@
    Un seul élément fort, l'heure à laquelle partir. Toute la fenêtre prend la couleur de la
    situation (vert, orange, rouge, noir), en camaïeu, sous des panneaux de verre. */
 
-/* Polices hébergées avec le site (fonts/, licence SIL OFL 1.1), sous-ensemble latin. */
-@font-face {
-  font-family: "Atkinson Hyperlegible";
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  src: url("../fonts/atkinson-hyperlegible-400.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Atkinson Hyperlegible";
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  src: url("../fonts/atkinson-hyperlegible-700.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Barlow Condensed";
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-  src: url("../fonts/barlow-condensed-500.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "Barlow Condensed";
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  src: url("../fonts/barlow-condensed-700.woff2") format("woff2");
-}
+/* Police du téléphone (choix de l'auteur, 22/10/2026) : SF Pro sur iPhone et Mac, Roboto sur
+   Android, Segoe UI sous Windows. La plus nette sur chaque écran, rien à télécharger. */
 
 /* Couleurs d'ambiance déclarées comme couleurs : le navigateur peut ainsi fondre l'une dans
    l'autre quand le ton change, au lieu de basculer d'un coup. */
@@ -97,8 +67,9 @@
   --late-ink: #FFFFFF;
   --late-muted: #B8C2CC;
 
-  --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
-  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Grands chiffres et titres : la même police, en gras et un peu resserrée. */
+  --font-display: var(--font-body);
 
   /* Verre : fond translucide, flou de ce qui passe dessous, reflet en haut, ombre douce. */
   --glass-bg: rgb(255 255 255 / 0.52);
@@ -109,6 +80,7 @@
 
   /* Ambiance par défaut (ton « none ») : camaïeu de gris bleuté. */
   --amb-1: #E7ECF0;
+  --bar: #E7ECF0; /* barre du navigateur (theme-color), sans transition */
   --amb-2: #D6DEE6;
   --amb-3: #F1F4F7;
   --amb-4: #C9D3DD;
@@ -121,7 +93,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-appearance="light"]) {
     --bg: #12202E;
     --surface: #1A2C3E;
     --ink: #EEF2F5;
@@ -149,6 +121,8 @@
     --glass-press: rgb(255 255 255 / 0.08);
 
     --amb-1: #12202E;
+
+    --bar: #12202E; /* barre du navigateur (theme-color), sans transition */
     --amb-2: #1A2C3E;
     --amb-3: #0E1925;
     --amb-4: #22384D;
@@ -159,6 +133,7 @@
    Suivre THEME dans js/core/ambient.js (barre du navigateur) si --amb-1 change. */
 :root[data-tone="ok"] {
   --amb-1: #D3EEDC;
+  --bar: #D3EEDC; /* barre du navigateur (theme-color), sans transition */
   --amb-2: #B2E2C1;
   --amb-3: #E6F6EB;
   --amb-4: #93D4A8;
@@ -166,6 +141,7 @@
 
 :root[data-tone="soon"] {
   --amb-1: #FADDC0;
+  --bar: #FADDC0; /* barre du navigateur (theme-color), sans transition */
   --amb-2: #F5C28F;
   --amb-3: #FCEBDA;
   --amb-4: #EFAA66;
@@ -173,28 +149,32 @@
 
 :root[data-tone="urgent"] {
   --amb-1: #F7D2CE;
+  --bar: #F7D2CE; /* barre du navigateur (theme-color), sans transition */
   --amb-2: #EFA9A1;
   --amb-3: #FBE3E0;
   --amb-4: #E6887F;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"])[data-tone="ok"] {
+  :root:not([data-appearance="light"])[data-tone="ok"] {
     --amb-1: #0E2A1D;
+    --bar: #0E2A1D; /* barre du navigateur (theme-color), sans transition */
     --amb-2: #14432C;
     --amb-3: #0A1F16;
     --amb-4: #1D5C3C;
   }
 
-  :root:not([data-theme="light"])[data-tone="soon"] {
+  :root:not([data-appearance="light"])[data-tone="soon"] {
     --amb-1: #33200D;
+    --bar: #33200D; /* barre du navigateur (theme-color), sans transition */
     --amb-2: #53330F;
     --amb-3: #261709;
     --amb-4: #6E4414;
   }
 
-  :root:not([data-theme="light"])[data-tone="urgent"] {
+  :root:not([data-appearance="light"])[data-tone="urgent"] {
     --amb-1: #361514;
+    --bar: #361514; /* barre du navigateur (theme-color), sans transition */
     --amb-2: #5A1F1C;
     --amb-3: #280F0E;
     --amb-4: #76292A;
@@ -205,6 +185,7 @@
 :root[data-tone="late"] {
   color-scheme: dark;
   --amb-1: #05070A;
+  --bar: #05070A; /* barre du navigateur (theme-color), sans transition */
   --amb-2: #12171E;
   --amb-3: #000000;
   --amb-4: #1E242C;
@@ -231,6 +212,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: var(--amb-1);
   transition-property: --amb-1, --amb-2, --amb-3, --amb-4, --ink, --muted;
   transition-duration: 1.2s;
@@ -402,8 +384,8 @@ main,
   gap: 0.35em;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.625rem;
-  letter-spacing: 0.01em;
+  font-size: 1.375rem;
+  letter-spacing: -0.01em;
 }
 
 /* Le logo : une fin de ligne telle qu'on la dessine sur un plan de tram,
@@ -433,7 +415,7 @@ main,
   min-height: 2.75rem;
   padding: 0.25rem 0.625rem;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   white-space: nowrap;
   font-weight: 700;
   color: var(--ink);
@@ -472,6 +454,11 @@ main,
   justify-content: center;
   width: 2.75rem;
   padding: 0;
+}
+
+/* Un bouton de l'en-tête masqué (l'œil du domicile, sans domicile) ne prend pas de place. */
+.picker[hidden] {
+  display: none;
 }
 
 /* Mode automatique : l'éclair, plein, à côté du repère. */
@@ -539,15 +526,14 @@ main {
 
 /* ---------- Écran principal : le compte à rebours, puis l'arrêt et le domicile ---------- */
 
-/* L'écran tient dans la hauteur du téléphone : l'heure au centre, les réglages sous le pouce. */
-/* Hauteur de l'écran moins l'en-tête et les marges : la tuile, la bande et « Mis à jour »
-   se partagent le reste, séparés par de larges espaces. */
+/* L'écran tient dans la hauteur visible du téléphone (barres du navigateur déduites) : la bande
+   Position / Domicile en haut, la tuile, puis « Mis à jour ». */
 .screen {
   min-height: calc(100vh - 6.25rem);
   min-height: calc(100svh - 6.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 /* Le ton colore les chiffres ; toute la fenêtre porte la couleur de la situation (.ambient).
@@ -607,7 +593,7 @@ main {
   font-size: clamp(4rem, min(40vw, 16vh), 11rem);
   font-size: clamp(4rem, min(40vw, 16svh), 11rem);
   line-height: 0.85;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.045em;
   font-variant-numeric: tabular-nums;
   color: var(--tone);
   white-space: nowrap;
@@ -649,7 +635,7 @@ main {
 
 .countdown-unit {
   font-size: 0.3em;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0;
   margin-inline: 0.08em;
 }
@@ -658,8 +644,17 @@ main {
   opacity: 0.6;
 }
 
+/* Un mot à la place des chiffres (« plus d'1 h », « maintenant », « trop tard ») : la ligne prend
+   la hauteur du mot, et non celle des grands chiffres, sinon un grand vide reste au-dessus. */
 .countdown-word {
+  display: inline-block;
   font-size: 0.4em;
+  line-height: 1;
+  letter-spacing: -0.01em; /* le resserrement des chiffres, trop fort pour des mots */
+}
+
+.countdown:has(> .countdown-word) {
+  line-height: 0;
 }
 
 .tone-ok {
@@ -705,7 +700,7 @@ main {
 .hero-time {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.5em;
+  font-size: 1.3em;
   font-variant-numeric: tabular-nums;
   vertical-align: -0.05em;
 }
@@ -716,7 +711,7 @@ main {
   align-items: center;
   gap: 0.45em;
   color: var(--muted);
-  font-size: 0.9375rem;
+  font-size: 1rem;
 }
 
 .hero-source::before {
@@ -820,7 +815,8 @@ main {
 .hero-big {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(3rem, 14vw, 4.5rem);
+  font-size: clamp(2.25rem, 10vw, 3.25rem);
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -844,7 +840,7 @@ main {
 .route-step {
   display: grid;
   /* Le texte prend sa largeur, pas toute la place : le bouton d'action le suit de près. */
-  grid-template-columns: 2.9rem 1.25rem minmax(0, max-content) auto;
+  grid-template-columns: 3.125rem 1.25rem minmax(0, max-content) auto;
   justify-content: start;
   column-gap: 0.5rem;
   align-items: center;
@@ -855,11 +851,11 @@ main {
   min-height: 2.5rem;
 }
 
+/* Police de texte et non condensée : en petit, des chiffres larges se lisent mieux d'un coup d'œil. */
 .route-time {
   color: var(--muted);
-  font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.0625rem;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
   line-height: 1;
@@ -918,7 +914,7 @@ main {
 
 .route-body {
   min-width: 0;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.25;
   overflow: hidden;
   white-space: nowrap;
@@ -929,24 +925,9 @@ main {
   font-weight: 700;
 }
 
-/* L'arrêt de départ ouvre la feuille « Arrêt de départ » : souligné en pointillé, comme un choix. */
-.route-stop-button {
-  padding: 0.5rem 0;
-  margin-block: -0.5rem;
-  font: inherit;
-  font-weight: 700;
-  color: var(--ink);
-  background: none;
-  border: 0;
-  text-decoration: underline dotted;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 0.25em;
-  cursor: pointer;
-}
-
 .is-ride .route-body {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 
 .is-ride .line-badge {
@@ -956,7 +937,7 @@ main {
 
 .route-note {
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 
 .route-link {
@@ -1004,39 +985,42 @@ main {
    colonne (intitulé, valeur) ; chaque colonne ouvre sa feuille. L'arrêt de départ se choisit en
    touchant son nom dans l'itinéraire. */
 /* De l'air entre la tuile du temps et la bande (ou l'annotation qui la précède). */
-.hero + .trip,
-.hero + .trip-callout {
-  margin-top: 0.5rem;
-}
-
+/* En haut de l'écran : deux pastilles, d'où vous partez et où vous rentrez. */
 .trip {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
 .trip-col {
   position: relative;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
 }
 
 
 .trip-button {
   width: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 0.0625rem;
-  min-height: 2.75rem;
-  padding: 0.375rem 0.25rem 0.5rem;
+  gap: 0.5rem;
+  min-height: 3rem;
+  padding: 0.3125rem 0.625rem 0.3125rem 0.3125rem;
+  flex: 1;
+  min-width: 0;
   font: inherit;
-  text-align: center;
+  text-align: left;
   color: var(--ink);
   background: none;
   border: 0;
-  border-radius: 18px;
+  border-radius: 999px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 0.2s ease, transform 0.15s ease;
@@ -1056,9 +1040,9 @@ main {
 .trip-icon {
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 50%;
   background: var(--glass-bg);
   border: 1px solid var(--glass-edge);
@@ -1081,24 +1065,53 @@ main {
   stroke-linejoin: round;
 }
 
+.trip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .trip-label {
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   line-height: 1.2;
 }
 
-/* Valeur sur deux lignes au plus : une adresse ou un nom de station tient en entier. */
+/* Valeur sur une ligne, coupée par des points de suspension : la feuille donne l'adresse entière. */
 .trip-value {
   max-width: 100%;
   font-weight: 700;
   font-size: 0.9375rem;
-  line-height: 1.2;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  line-height: 1.25;
+  white-space: nowrap;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+}
+
+/* Adresse masquée : la rue floutée au point d'être illisible (texte transparent, ombre floue de la
+   couleur du texte). Le flou ne déborde pas de la ligne : rien n'est coupé net par la pastille. */
+.trip-value:has(.home-street) {
+  box-sizing: border-box;
+  max-width: calc(100% + 1.25rem);
+  padding: 0.375rem 0.625rem;
+  margin: -0.375rem -0.625rem;
+}
+
+.home-street {
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.home-street.is-blurred {
+  color: transparent;
+  text-shadow: 0 0 0.625rem var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-street {
+    transition: none;
+  }
 }
 
 .trip-value .line-badge {
@@ -1136,7 +1149,7 @@ main {
   }
 
   .route-step {
-    min-height: 2.25rem;
+    min-height: 2.5rem;
   }
 
   .route-step.is-ride {
@@ -1144,14 +1157,21 @@ main {
   }
 
   .trip-icon {
-    width: 2.25rem;
-    height: 2.25rem;
-    margin-bottom: 0.125rem;
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .hero.is-glance {
+    gap: 0.5rem;
+  }
+
+  .trip-summary {
+    padding-block: 0.625rem;
   }
 
 }
 
-/* Information manquante : la colonne passe à la couleur d'accent. */
+/* Information manquante : la pastille passe à la couleur d'accent. */
 .is-missing .trip-value,
 .is-missing .trip-label {
   color: var(--accent);
@@ -1161,11 +1181,11 @@ main {
   stroke: var(--accent);
 }
 
-/* Annotation juste au-dessus de la bande, pointe vers la colonne qui manque (--col). */
+/* Annotation juste sous la bande, pointe vers la pastille qui manque (--col). */
 .trip-callout {
   --col: 0;
   position: relative;
-  margin: 0.25rem 0 0.125rem;
+  margin: -0.5rem 0 0;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-control);
   background: var(--accent);
@@ -1178,11 +1198,11 @@ main {
 .trip-callout::after {
   content: "";
   position: absolute;
-  bottom: -0.5rem;
+  top: -0.5rem;
   left: calc((100% / 2) * (var(--col) + 0.5) - 0.5rem);
   border: 0.5rem solid transparent;
-  border-bottom: 0;
-  border-top-color: var(--accent);
+  border-top: 0;
+  border-bottom-color: var(--accent);
 }
 
 .visually-hidden {
@@ -1218,9 +1238,9 @@ main {
 
 /* ---------- Méta et messages ---------- */
 
-/* « Mis à jour » va avec le pied de page : loin de la bande au-dessus, près du pied en dessous. */
+/* « Mis à jour », sous la tuile, discret. */
 .meta {
-  margin-top: 1.75rem;
+  margin-top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1230,10 +1250,11 @@ main {
   font-size: 0.875rem;
 }
 
-/* Actualiser : un rond de verre en haut à droite de la tuile du temps. */
+/* Actualiser : un rond de verre en bas à droite de la tuile (sur la ligne de l'itinéraire à pied
+   quand il y en a une). */
 .hero-refresh {
   position: absolute;
-  top: 0.75rem;
+  bottom: 0.75rem;
   right: 0.75rem;
   display: grid;
   place-items: center;
@@ -1293,7 +1314,7 @@ main {
 .message-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 2rem;
+  font-size: 1.625rem;
   line-height: 1.1;
 }
 
@@ -1508,7 +1529,7 @@ main {
 .sheet-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.625rem;
+  font-size: 1.375rem;
   line-height: 1.1;
 }
 
@@ -1537,6 +1558,555 @@ main {
   stroke: currentColor;
   stroke-width: 2.25;
   stroke-linecap: round;
+}
+
+/* ---------- Tuile en coup d'œil : le trajet, l'autre tracé, l'itinéraire à pied ---------- */
+
+/* Pensée pour le pouce : en haut ce qui se lit, en bas ce qui se touche. De haut en bas : le choix
+   du tracé, l'heure (posée sur la tuile, sans panneau), le trajet dans sa section, puis les
+   boutons. L'heure prend la hauteur qui reste : les boutons restent en bas de la tuile. */
+.hero.is-glance {
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+/* L'heure : quatre lignes qui se suivent, séparées par un même espace régulier, pour respirer. */
+.hero.is-glance .hero-head {
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: 0.625rem;
+  padding-block: 0.5rem;
+}
+
+.hero.is-glance .hero-label,
+.hero.is-glance .hero-sub,
+.hero.is-glance .hero-source {
+  line-height: 1.2;
+}
+
+.hero.is-glance .hero-time {
+  line-height: 1;
+}
+
+/* Les grands chiffres ont un peu de vide au-dessus de leur sommet, presque rien sous leur base :
+   on les remonte d'autant pour que l'espace paraisse le même entre les quatre lignes. */
+.hero.is-glance .countdown {
+  margin-block: -0.06em 0.04em;
+}
+
+/* La barre de calcul passe tout en haut de la tuile, sans prendre de place. */
+.hero.is-glance .progress {
+  position: absolute;
+  top: 0.375rem;
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+/* Choix du tracé, en haut de la tuile : un contrôle segmenté, chacun avec son heure limite. Le
+   choix en cours est marqué par une pastille de verre clair qui glisse d'un côté à l'autre
+   (--active : 0 à gauche, 1 à droite). */
+.route-modes {
+  --pad: 0.25rem;
+  --gap: 0.25rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gap);
+  width: 100%;
+  padding: var(--pad);
+  border-radius: 16px;
+  background: var(--glass-press);
+}
+
+.route-modes::before {
+  content: "";
+  position: absolute;
+  top: var(--pad);
+  bottom: var(--pad);
+  left: var(--pad);
+  width: calc((100% - 2 * var(--pad) - var(--gap)) / 2);
+  border-radius: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-sheen), 0 2px 8px rgb(0 0 0 / 0.08);
+  transform: translateX(calc(var(--active, 0) * (100% + var(--gap))));
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Le temps de poser l'ancien choix avant de glisser vers le nouveau. */
+.route-modes.is-still::before,
+.route-modes.is-still .route-mode {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-modes::before,
+  .route-mode {
+    transition: none;
+  }
+}
+
+.route-mode {
+  position: relative; /* au-dessus de la pastille */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  min-height: 3rem;
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  color: var(--muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, color 0.3s ease;
+}
+
+.route-mode:active {
+  transform: scale(0.97);
+}
+
+.route-mode[aria-pressed="true"] {
+  color: var(--ink);
+}
+
+.route-mode-label {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  line-height: 1.2;
+}
+
+.route-mode-time {
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+/* Le trajet, dans une section claire : le résumé, puis la carte sur toute la largeur, carrée. On
+   touche la section entière pour ouvrir le détail (un bouton étiré par-dessus, comme une miniature
+   de carte). */
+.trip-card {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+  text-align: left;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-sheen);
+  transition: transform 0.15s ease;
+}
+
+.trip-card:active {
+  transform: scale(0.985);
+}
+
+.trip-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.summary-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.summary-line > span:last-child {
+  min-width: 0;
+  text-wrap: pretty;
+}
+
+.summary-line .line-badge {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+}
+
+/* Un nom de station ne se coupe pas (« Saint-Nicolas ») : il passe à la ligne en entier, et un
+   nom trop long finit par des points de suspension. */
+.summary-stop {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.trip-card .leaflet-control-attribution {
+  padding: 0 0.25rem;
+  font-size: 0.625rem;
+  line-height: 1.5;
+}
+
+.summary-glyph {
+  width: 1.375rem;
+  height: 1.375rem;
+  flex-shrink: 0;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* La carte garde toute la largeur de la section et prend la moitié de cette largeur en hauteur. */
+.trip-card-map {
+  position: relative;
+  border-top: 1px solid var(--glass-edge);
+}
+
+.trip-card .route-map {
+  width: 100%;
+  aspect-ratio: 2;
+}
+
+/* « Agrandir », sur le coin de la carte : la section ouvre le détail. */
+.trip-card-expand {
+  position: absolute;
+  z-index: 1050;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
+}
+
+.expand-glyph {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trip-card-open {
+  position: absolute;
+  z-index: 1100; /* au-dessus des calques de Leaflet */
+  inset: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trip-card-open:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -3px;
+}
+
+/* En bas, sous le pouce : l'itinéraire à pied, l'action principale, et Actualiser à sa droite. */
+.hero-actions {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* L'action principale : à la couleur du ton (vert, orange, rouge). */
+.hero-go {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  background: var(--tone);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: 1.125rem;
+  text-decoration: none;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--tone) 28%, transparent);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, background-color 0.4s ease;
+}
+
+.hero-go:active {
+  transform: scale(0.98);
+}
+
+.hero-go .route-go-glyph {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.hero-actions .hero-refresh {
+  position: static;
+  flex: none;
+  width: 3.5rem;
+  height: auto;
+  border-radius: 18px;
+}
+
+/* Changement de tracé : le nouveau trajet apparaît en fondu, sans saut. */
+@media (prefers-reduced-motion: no-preference) {
+  .is-switched .hero-head,
+  .is-switched .trip-summary {
+    animation: switch-in 0.35s ease both;
+  }
+}
+
+@keyframes switch-in {
+  from {
+    opacity: 0.15;
+  }
+}
+
+/* Petits écrans (iPhone SE dans Safari, ~550 px visibles) : la carte carrée rétrécit, les
+   sections et les lignes à toucher se resserrent, sans descendre sous 44 px. */
+@media (max-height: 660px) {
+  .screen {
+    gap: 0.5rem;
+  }
+
+  .hero.is-glance {
+    gap: 0.3125rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .hero.is-glance .countdown {
+    font-size: clamp(3.25rem, min(36vw, 12svh), 11rem);
+  }
+
+  .hero.is-glance .hero-sub {
+    font-size: 1.0625rem;
+  }
+
+  .hero.is-glance .hero-source {
+    font-size: 0.9375rem;
+  }
+
+  .route-modes {
+    --pad: 0.1875rem;
+  }
+
+  .hero.is-glance .hero-head {
+    margin-bottom: 0;
+    gap: 0.375rem;
+  }
+
+  .trip-summary {
+    gap: 0.25rem;
+    padding-block: 0.5rem;
+    font-size: 0.9375rem;
+  }
+
+  .trip-button {
+    min-height: 2.75rem;
+  }
+
+  .hero-actions .hero-refresh {
+    width: 3rem;
+  }
+
+  .route-mode {
+    min-height: 2.75rem;
+    padding-block: 0.25rem;
+  }
+
+  .hero-go {
+    min-height: 3rem;
+    padding-block: 0.5rem;
+  }
+}
+
+/* ---------- Feuille « Votre trajet » : la carte, puis les étapes ---------- */
+
+/* La carte reste en haut et se déplace au doigt ; seules les étapes défilent, dessous. */
+.detail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.detail-map {
+  position: relative;
+  flex: none;
+  height: clamp(12rem, 42vh, 24rem);
+  height: clamp(12rem, 42svh, 24rem);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+}
+
+.detail-map .route-map {
+  position: absolute;
+  inset: 0;
+}
+
+.map-recenter {
+  position: absolute;
+  z-index: 1100;
+  top: 0.625rem;
+  right: 0.625rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.75rem;
+  padding: 0 0.875rem 0 0.625rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+}
+
+.map-recenter .trip-glyph {
+  width: 1.125rem;
+  height: 1.125rem;
+  stroke: var(--ink);
+}
+
+.detail-steps {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.detail-steps .route {
+  margin: 0;
+}
+
+/* ---------- Carte de l'itinéraire (aperçu de la tuile et feuille, js/features/last-ride/route-map.js) ---------- */
+
+/* Les traits et les repères suivent les jetons de couleur : clairs sur la carte assombrie, la nuit.
+   Sa place (aperçu de la tuile, carte de la feuille) est réglée plus bas. */
+.route-map {
+  background: var(--surface);
+  font: inherit;
+  color: var(--ink);
+}
+
+.route-map[hidden] {
+  display: none;
+}
+
+/* Le Plan IGN n'existe qu'en clair : en sombre et quand c'est trop tard, il est inversé, teintes
+   conservées, pour ne pas éblouir. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) .route-map .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+  }
+}
+
+:root[data-tone="late"] .route-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+}
+
+.route-map .map-walk {
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-dasharray: 1 7;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.route-map .map-casing {
+  stroke: var(--surface);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.route-map .map-ride {
+  stroke-width: 5;
+  stroke-opacity: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+/* Arrêts : un rond creux à la couleur de la ligne, comme dans l'itinéraire de la tuile. */
+.route-map .map-stop {
+  stroke-width: 3;
+  fill: var(--surface);
+  fill-opacity: 1;
+}
+
+.route-map .map-label {
+  padding: 0.125rem 0.375rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+
+/* Sans pointe, à distance du rond de l'arrêt. */
+.route-map .map-label::before {
+  display: none;
+}
+
+.route-map .leaflet-tooltip-right.map-label {
+  margin-left: 0.75rem;
+}
+
+.route-map .leaflet-tooltip-left.map-label {
+  margin-left: -0.75rem;
+}
+
+/* Position et domicile : les pictogrammes des blocs, dans un rond plein. */
+.route-map .map-pin {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--surface);
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--surface), 0 2px 8px rgb(0 0 0 / 0.25);
+}
+
+.route-map .map-pin .trip-glyph {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.route-map .leaflet-control-attribution {
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+
+.route-map .leaflet-control-attribution a {
+  color: inherit;
 }
 
 .sheet-body {
@@ -1652,7 +2222,7 @@ main {
 
 .sheet-current-label {
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
 }
 
 .sheet-current-value {
@@ -1735,7 +2305,7 @@ main {
 .legal h1 {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 2.25rem;
+  font-size: 1.875rem;
   line-height: 1.05;
 }
 
@@ -1743,7 +2313,7 @@ main {
   margin-top: 0.75rem;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   line-height: 1.1;
 }
 

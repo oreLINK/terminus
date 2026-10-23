@@ -1,5 +1,5 @@
 // Position de la personne, partagée par la coquille (choix automatique de la ville)
-// et par les types d'information. Deux sources : le GPS du navigateur, ou un lieu saisi.
+// et par les modes. Deux sources : le GPS du navigateur, ou un lieu saisi.
 // Pour le GPS, l'adresse correspondante est cherchée ensuite (événement "address").
 
 import { reverseAddress } from "./geocode.js";

@@ -49,6 +49,7 @@ export function buildIndex(stops) {
 
   const byRef = new Map();
   const byKey = new Map();
+  const points = new Map(stops.map((s) => [s.ref, { lat: s.lat, lon: s.lon }]));
   for (const st of stations) {
     for (const r of st.refs) byRef.set(r, st);
     if (!byKey.has(st.key)) byKey.set(st.key, []);
@@ -63,6 +64,8 @@ export function buildIndex(stops) {
       const sameName = byKey.get(normName(call.name));
       return sameName && sameName.length === 1 ? sameName[0] : null;
     },
+    // Position du quai lui-même, plus fidèle au tracé que le centre de la station.
+    pointOf: (ref) => points.get(ref) ?? null,
   };
 }
 
@@ -89,6 +92,11 @@ export const TRANSFER_MS = 2 * MIN;
 // Marge ajoutée à la marche jusqu'à l'arrêt de départ : on part 2 min plus tôt que le strict nécessaire.
 export const WALK_MARGIN_MS = 2 * MIN;
 export const MAX_TRANSFERS = 2;
+// Tracé « le plus pratique » : l'heure limite de départ, diminuée de l'effort du trajet. Chaque
+// minute de marche (jusqu'à l'arrêt et jusqu'au domicile) compte une fois de plus, chaque
+// correspondance compte 10 min (choix de l'auteur, 22/10/2026).
+export const WALK_PENALTY = 1;
+export const TRANSFER_PENALTY_MS = 10 * MIN;
 
 // Horaires à charger d'après le graphe du réseau (ordre des arrêts par ligne et par sens), avant
 // tout appel : [{ line, direction }]. Garde les motifs utiles à un trajet d'au plus `extraTransfers`
@@ -162,7 +170,8 @@ function buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd }) 
     const prev = profiles[k - 1];
     const byStation = new Map();
 
-    for (const { j, stations } of runs) {
+    for (const run of runs) {
+      const { j, stations } = run;
       // En remontant la course : meilleure descente parmi les arrêts suivants.
       let best = null;
       for (let i = j.calls.length - 1; i >= 0; i--) {
@@ -186,12 +195,16 @@ function buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd }) 
               depLive: call.depLive,
               arr: best.call.arr,
               arrLive: best.call.arrLive,
+              // Arrêts parcourus, pour la carte (voir itinerary).
+              run,
+              fromIndex: i,
+              toIndex: best.index,
             },
             next: best.next,
           });
         }
 
-        const here = k === 0 ? alightHome(st, call, destById) : alightTransfer(st, call, j, prev);
+        const here = k === 0 ? alightHome(st, call, i, destById) : alightTransfer(st, call, i, j, prev);
         if (here && (!best || here.arrHome < best.arrHome)) best = here;
       }
     }
@@ -203,15 +216,15 @@ function buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd }) 
 }
 
 // Descente à une station proche du domicile, puis marche.
-function alightHome(station, call, destById) {
+function alightHome(station, call, index, destById) {
   const dest = destById.get(station.id);
-  return dest ? { station, call, dest, next: null, arrHome: call.arr + dest.walk.minutes * MIN } : null;
+  return dest ? { station, call, index, dest, next: null, arrHome: call.arr + dest.walk.minutes * MIN } : null;
 }
 
 // Descente pour une correspondance : le premier départ utile après le changement de quai.
-function alightTransfer(station, call, journey, prev) {
+function alightTransfer(station, call, index, journey, prev) {
   const next = firstFrom(prev.get(station.id), call.arr + TRANSFER_MS, journey.id);
-  return next ? { station, call, dest: next.dest, next, arrHome: next.arrHome } : null;
+  return next ? { station, call, index, dest: next.dest, next, arrHome: next.arrHome } : null;
 }
 
 function frontier(entries) {
@@ -268,6 +281,65 @@ export function serviceEndAfter(now, { timeZone, hour }) {
   return end - offset;
 }
 
+// Date locale d'un instant dans le fuseau du réseau : { year, month, day, weekday } (0 = dimanche).
+export function localDate(ms, timeZone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(ms)
+      .map((p) => [p.type, Number(p.value)]),
+  );
+  return addDays(parts, 0);
+}
+
+export function addDays({ year, month, day }, n) {
+  const d = new Date(Date.UTC(year, month - 1, day + n));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), weekday: d.getUTCDay() };
+}
+
+// Matin de la nuit de service en cours : la date locale de sa fin. La nuit du jeudi au vendredi
+// a pour matin le vendredi, à 18 h le jeudi comme à 4 h le vendredi.
+export const serviceMorning = (now, { timeZone, hour }) => localDate(serviceEndAfter(now, { timeZone, hour }), timeZone);
+
+// Commune d'une adresse de la Géoplateforme (« 12 Rue X 33700 Mérignac » → « merignac »), normalisée
+// pour la comparer à une liste : minuscules, sans accents ni tirets, « St » écrit « saint ».
+export const normCommune = (name) =>
+  name
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[-'’]/g, " ")
+    .replace(/\bst\b/g, "saint")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export function communeOf(label) {
+  const m = /\b\d{5}\s+(.+)$/.exec(label ?? "");
+  return m ? normCommune(m[1]) : null;
+}
+
+// Zones à la demande (TBNight) : au-delà de son dernier arrêt fixe, une ligne dessert les arrêts
+// réservés dans certaines communes. Si le domicile est dans l'une d'elles, le dernier arrêt fixe de
+// la ligne devient une arrivée possible, sans marche : on reste dans le bus. L'heure d'arrivée est
+// celle du dernier arrêt fixe (la suite dépend des réservations).
+// zones : [{ line: code, communes: [nom] }] ; renvoie des arrivées au format de nearestStations.
+export function zoneDests({ zones, commune, graph, index, lineCodes }) {
+  if (!zones?.length || !commune || !graph) return [];
+  const out = [];
+  for (const zone of zones) {
+    const match = zone.communes.find((c) => normCommune(c) === commune);
+    if (!match) continue;
+    for (const p of graph.patterns) {
+      if (lineCodes[p.line] !== zone.line) continue;
+      const last = p.stops[p.stops.length - 1];
+      const station = index.stationFor({ ref: last, name: graph.names?.[last] ?? "" });
+      if (station && !out.some((d) => d.station.id === station.id)) {
+        out.push({ station, walk: { straight: 0, meters: 0, minutes: 0 }, zone: { line: zone.line, commune: match } });
+      }
+    }
+  }
+  return out;
+}
+
 // Plage horaire où le compte à rebours fonctionne (de 18 h à 3 h à Bordeaux), qui peut passer
 // minuit. On y est quand sa fin arrive avant son prochain début.
 export function inServiceWindow(now, { timeZone, startHour, endHour }) {
@@ -276,9 +348,17 @@ export function inServiceWindow(now, { timeZone, startHour, endHour }) {
 
 // Trajet complet à partir d'un départ du profil. Les champs du premier tronçon restent à la
 // racine (dep, lineCode…) : c'est le tram à prendre depuis l'arrêt de départ.
-function itinerary(entry, lineCodes) {
+// Chaque tronçon a son `path` : les positions des arrêts parcourus, de la montée à la descente.
+function itinerary(entry, lineCodes, index) {
   const legs = [];
-  for (let e = entry; e; e = e.next) legs.push({ ...e.leg, lineCode: lineCodes[e.leg.line] ?? "?" });
+  for (let e = entry; e; e = e.next) {
+    const { run, fromIndex, toIndex, ...leg } = e.leg;
+    const path = run.j.calls
+      .slice(fromIndex, toIndex + 1)
+      .map((c, k) => index.pointOf(c.ref) ?? run.stations[fromIndex + k])
+      .filter(Boolean);
+    legs.push({ ...leg, lineCode: lineCodes[leg.line] ?? "?", path });
+  }
   const [first] = legs;
   const final = legs[legs.length - 1];
   return {
@@ -301,7 +381,9 @@ function itinerary(entry, lineCodes) {
 // Les courses partielles (qui s'arrêtent avant la station d'arrivée) ne servent que si une
 // correspondance permet de finir le trajet.
 // `serviceEnd` : fin du service en cours (serviceEndAfter) ; aucun tronçon ne part après elle.
-export function plan({ origins, dests, journeys, index, lineCodes, now, serviceEnd = Infinity, maxTransfers = MAX_TRANSFERS }) {
+// `serviceGap` : au-delà de cet écart avant le prochain départ, la journée est finie (statut
+// `ended`). Infinity pour le prochain bus de nuit, qui peut passer plusieurs heures plus tard.
+export function plan({ origins, dests, journeys, index, lineCodes, now, serviceEnd = Infinity, serviceGap = SERVICE_GAP_MS, maxTransfers = MAX_TRANSFERS }) {
   const destById = new Map(dests.map((d) => [d.station.id, d]));
   const profiles = buildProfiles({ journeys, index, destById, maxTransfers, serviceEnd });
 
@@ -316,7 +398,7 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
       const future = entries.filter((e) => e.dep >= now - MIN);
       if (entries.some((e) => e.dep < now - MIN)) servedEarlier = true;
       if (future.length) upcoming = true;
-      const catchable = future.filter((e) => e.dep >= now + walkToMs).map((e) => itinerary(e, lineCodes));
+      const catchable = future.filter((e) => e.dep >= now + walkToMs).map((e) => itinerary(e, lineCodes, index));
       if (!catchable.length) return;
       const next = catchable[0];
       const last = catchable[catchable.length - 1];
@@ -329,6 +411,7 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
         catchable,
         next,
         last,
+        walkToMs,
         leaveBy: last.dep - walkToMs,
         arriveHome: next.arrHome,
       });
@@ -347,8 +430,8 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
       ),
   );
 
-  // Un seul tracé recommandé : celui qui laisse partir le plus tard, c'est-à-dire le dernier tram
-  // possible sur tout le trajet. À égalité : moins de correspondances, moins de marche, arrivée plus tôt.
+  // Tracé « le plus tard » (primary) : celui qui laisse partir le plus tard, c'est-à-dire le dernier
+  // tram possible sur tout le trajet. À égalité : moins de correspondances, moins de marche, arrivée plus tôt.
   options.sort(
     (a, b) =>
       b.leaveBy - a.leaveBy ||
@@ -364,7 +447,45 @@ export function plan({ origins, dests, journeys, index, lineCodes, now, serviceE
 
   const primary = options[0];
   // La journée commerciale a basculé : le prochain départ est demain matin.
-  if (primary.next.dep - now > SERVICE_GAP_MS) return { status: "ended", options, primary };
+  if (primary.next.dep - now > serviceGap) return { status: "ended", options, primary };
 
-  return { status: "ok", options, primary };
+  return { status: "ok", options, primary, comfortable: mostComfortable(options), soonest: soonestOf(options) };
 }
+
+// Tracé « le prochain » (mode « Le prochain bus de nuit ») : de chaque arrêt, le premier départ
+// encore atteignable ; parmi eux, celui qui ramène le plus tôt, sans long détour à pied ni
+// correspondance inutile (marche jusqu'à l'arrêt et correspondances pénalisées comme pour le plus
+// pratique ; la marche à l'arrivée compte déjà dans l'heure d'arrivée). À score égal : départ plus
+// tôt. Même forme qu'une option, avec ce trajet comme `last`.
+function soonestOf(options) {
+  const score = (o) => o.next.arrHome + o.origin.walk.minutes * MIN * WALK_PENALTY + o.transfers * TRANSFER_PENALTY_MS;
+  let best = null;
+  for (const o of options) {
+    if (!best || score(o) < score(best) || (score(o) === score(best) && o.next.dep < best.next.dep)) best = o;
+  }
+  return { ...best, last: best.next, dest: best.next.dest, leaveBy: best.next.dep - best.walkToMs };
+}
+
+// Tracé « le plus pratique » : parmi tous les trajets atteignables (pas seulement le dernier de
+// chaque option), le meilleur score (heure limite moins l'effort, voir WALK_PENALTY). Même forme
+// qu'une option, avec ce trajet comme `last`. À score égal : départ plus tard, moins de correspondances.
+function mostComfortable(options) {
+  const ahead = (a, b) => a.score - b.score || a.leaveBy - b.leaveBy || b.transfers - a.transfers;
+  let best = null;
+  for (const o of options) {
+    for (const trip of o.catchable) {
+      const leaveBy = trip.dep - o.walkToMs;
+      const walkMin = o.origin.walk.minutes + trip.dest.walk.minutes;
+      const score = leaveBy - walkMin * MIN * WALK_PENALTY - o.transfers * TRANSFER_PENALTY_MS;
+      const candidate = { score, leaveBy, transfers: o.transfers, option: o, trip };
+      if (!best || ahead(candidate, best) > 0) best = candidate;
+    }
+  }
+  return { ...best.option, last: best.trip, dest: best.trip.dest, leaveBy: best.leaveBy };
+}
+
+// Deux tracés identiques : même suite de courses, même arrivée.
+export const sameTrip = (a, b) =>
+  a.last.legs.length === b.last.legs.length &&
+  a.last.legs.every((leg, i) => leg.journeyId === b.last.legs[i].journeyId && leg.from.id === b.last.legs[i].from.id) &&
+  a.dest.station.id === b.dest.station.id;

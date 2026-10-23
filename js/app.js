@@ -1,15 +1,17 @@
-// Coquille de Terminus : choisit le réseau (la ville) et le type d'information,
-// automatiquement ou à la main, puis monte le type d'information dans <main>.
+// Coquille de Terminus : choisit le réseau (la ville) et le mode,
+// automatiquement ou à la main, puis monte le mode dans <main>.
 
 import { NETWORKS, getNetwork, networkAt } from "./networks/index.js";
-import { FEATURES, DEFAULT_FEATURE, featuresFor } from "./features/index.js";
+import { DEFAULT_FEATURE, featuresFor } from "./features/index.js";
 import { location } from "./core/location.js";
 import { openSheet, closeSheet, sheetOptions, sheetNote, boltSvg, AUTOMATIC } from "./core/sheet.js";
 import { readJSON, writeJSON } from "./core/storage.js";
 import { esc, clock } from "./core/util.js";
 import { lab, now, clearLab } from "./core/lab.js";
+import { startSeason } from "./core/season.js";
 
-const PREFS_KEY = "dt.prefs.v1"; // { city: "auto" | id, feature: "auto" | id, lastNetwork: id }
+// { city: "auto" | id, feature: id (mode choisi à la main ; absent ou ancien « auto » : celui de la ville), lastNetwork: id }
+const PREFS_KEY = "dt.prefs.v1";
 
 const root = document.getElementById("app");
 const cityButton = document.getElementById("picker-city-button");
@@ -17,7 +19,7 @@ const cityLabel = document.getElementById("picker-city");
 const featureLabel = document.getElementById("picker-feature");
 
 
-const prefs = { city: "auto", feature: "auto", lastNetwork: null, ...readJSON(PREFS_KEY) };
+const prefs = { city: "auto", feature: null, lastNetwork: null, ...readJSON(PREFS_KEY) };
 const savePrefs = () => writeJSON(PREFS_KEY, prefs);
 
 let current = { network: null, feature: null, instance: null };
@@ -33,17 +35,15 @@ function resolveNetwork() {
   return networkAt(location.here) ?? getNetwork(prefs.lastNetwork) ?? NETWORKS[0];
 }
 
-// Type d'information : celui choisi à la main s'il existe sur ce réseau, sinon le type par défaut.
+// Mode : celui choisi à la main s'il existe sur ce réseau, sinon celui de la ville
+// (Bordeaux : le dernier tram).
 function resolveFeature(network) {
   const available = featuresFor(network);
-  if (prefs.feature !== "auto") {
-    const chosen = available.find((f) => f.id === prefs.feature);
-    if (chosen) return chosen;
-  }
-  return available.find((f) => f.id === DEFAULT_FEATURE) ?? available[0];
+  const byId = (id) => available.find((f) => f.id === id);
+  return byId(prefs.feature) ?? byId(network.defaultFeature) ?? byId(DEFAULT_FEATURE) ?? available[0];
 }
 
-// Monte le bon type d'information ; ne fait rien si rien n'a changé.
+// Monte le bon mode ; ne fait rien si rien n'a changé.
 function mount() {
   const network = resolveNetwork();
   const feature = resolveFeature(network);
@@ -72,7 +72,7 @@ function paintChrome() {
   cityLabel.innerHTML = auto
     ? `${boltSvg("picker-icon picker-bolt")}<span class="visually-hidden">Ville automatique : ${esc(network.city)}</span>`
     : `<span class="visually-hidden">Ville : </span>${esc(network.city)}`;
-  featureLabel.textContent = `Information : ${feature.short}`;
+  featureLabel.textContent = `Mode : ${feature.short}`;
 }
 
 // ---------- Sélecteurs ----------
@@ -100,27 +100,20 @@ function openCitySheet() {
   body.querySelector('[aria-pressed="true"]')?.focus();
 }
 
+// Les modes de la ville, sans choix automatique : le mode affiché est coché.
 function openFeatureSheet() {
   const available = featuresFor(current.network);
-  const byDefault = FEATURES.find((f) => f.id === DEFAULT_FEATURE);
   const body = openSheet(
-    "Information",
-    sheetOptions([
-      {
-        action: "pick-feature",
-        value: "auto",
-        main: AUTOMATIC,
-        detail: esc(byDefault.title),
-        pressed: prefs.feature === "auto",
-      },
-      ...available.map((f) => ({
+    "Mode",
+    sheetOptions(
+      available.map((f) => ({
         action: "pick-feature",
         value: f.id,
         main: esc(f.title),
         detail: esc(f.description),
-        pressed: prefs.feature === f.id,
+        pressed: current.feature?.id === f.id,
       })),
-    ]) + sheetNote("D'autres informations arriveront."),
+    ) + sheetNote("D'autres modes arriveront."),
   );
   body.querySelector('[aria-pressed="true"]')?.focus();
 }
@@ -167,4 +160,6 @@ if (lab) {
   });
 }
 
+// Thème de saison d'abord : la première image a déjà ses couleurs.
+startSeason();
 mount();

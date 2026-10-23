@@ -8,8 +8,8 @@ Terminus est un site statique qui aide à déterminer quel tram prendre pour ren
 - APIs publiques appelées directement depuis le navigateur : SIRI-Lite de Bordeaux Métropole et géocodage de la Géoplateforme IGN.
 - GitHub Pages pour l'hébergement statique.
 - Node.js 18 ou plus récent pour les tests ; Python 3 pour le serveur local.
-- Polices (Barlow Condensed, Atkinson Hyperlegible) hébergées dans `fonts/`, sous licence SIL OFL 1.1 : aucune ressource n'est chargée depuis un service tiers au démarrage.
-- La logique de calcul (`js/features/last-ride/planner.js`) est pure et se teste avec `node:test` sans navigateur, comme les registres de réseaux et de types d'information.
+- Polices : celles de l'appareil (SF Pro sur iPhone, Roboto sur Android) : aucune police n'est téléchargée, aucune ressource n'est chargée depuis un service tiers au démarrage.
+- La logique de calcul (`js/features/last-ride/planner.js`) est pure et se teste avec `node:test` sans navigateur, comme les registres de réseaux et de modes.
 
 `package.json` ne déclare aucune dépendance : ses scripts servent aux tests et au serveur local.
 
@@ -33,7 +33,7 @@ Exécutez la suite de tests avant de proposer un changement :
 npm test
 ```
 
-Ajoutez ou adaptez un test lorsque le comportement calculé change. Toute modification de `planner.js` doit être accompagnée d'un test dans `tests/planner.test.mjs`. Un nouveau réseau ou type d'information doit passer `tests/registry.test.mjs`.
+Ajoutez ou adaptez un test lorsque le comportement calculé change. Toute modification de `planner.js` doit être accompagnée d'un test dans `tests/planner.test.mjs`. Un nouveau réseau ou mode doit passer `tests/registry.test.mjs`.
 
 ### Graphe du réseau
 
@@ -43,9 +43,19 @@ Ajoutez ou adaptez un test lorsque le comportement calculé change. Toute modifi
 npm run graph
 ```
 
+Pour les bus de nuit TBNight, `npm run graph -- --night` génère `night-stops.js` et `night-graph.js`, à lancer un jeudi, vendredi ou samedi après-midi (l'API ne connaît alors que les courses de la nuit qui vient).
+
 La même commande génère `js/networks/bordeaux-tbm/stops.js` : les lignes et arrêts de tram, que le site charge sans appeler l'API (`npm run graph -- --stops-only` ne régénère que lui).
 
-Relancez-la après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée et hors travaux** : le soir ou un jour de travaux, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
+`js/networks/bordeaux-tbm/shapes.js` contient le tracé réel des lignes de tram et TBNight, pour la carte. Il est tiré du GTFS statique de TBM (environ 22 Mo téléchargés, lus avec la commande `unzip` du système), simplifié et versionné :
+
+```sh
+npm run shapes
+```
+
+Relancez-la quand une ligne change de parcours. Sans tracé pour un tronçon, la carte relie les arrêts en ligne droite.
+
+Relancez `npm run graph` après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée et hors travaux** : le soir ou un jour de travaux, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
 
 ## Branches, contributions et GitHub
 
@@ -69,7 +79,7 @@ Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJEC
 ### Actions
 
 - `.github/workflows/tests.yml` (**Tests**) : `npm test` à chaque push sur `dev` et sur chaque pull request vers `main`.
-- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `fonts/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
+- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
 
 La version en ligne est consultable à `https://<utilisateur>.github.io/<repo>/version.json`.
 
@@ -83,7 +93,7 @@ Ces réglages vivent dans GitHub, pas dans le dépôt : vérifiez-les dans **Set
 
 ## Déploiement GitHub Pages
 
-Le site est servi depuis la branche `gh-pages`, alimentée par l'Action de déploiement à chaque merge dans `main` (voir ci-dessus). `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `css/`, `js/` et `fonts/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
+Le site est servi depuis la branche `gh-pages`, alimentée par l'Action de déploiement à chaque merge dans `main` (voir ci-dessus). `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `css/`, `js/` et `vendor/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
 
 GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossier doit être servi (images, manifeste…), ajoutez-le à l'étape « Assembler le site » de `deploy.yml`.
 
@@ -92,19 +102,19 @@ GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossi
 Le site est découpé en trois couches pour accueillir d'autres villes et d'autres informations :
 
 - `js/networks/` : un dossier par réseau de transport (ville, zone, couleurs de lignes, sources, adaptateurs d'API).
-- `js/features/` : un dossier par type d'information (aujourd'hui « Le dernier tram pour rentrer », `last-ride`).
-- `js/core/` : ce qui est commun (position, domicile, stockage, feuilles, champ d'adresse, géocodage).
+- `js/features/` : un dossier par mode (aujourd'hui deux : « Le dernier tram », `last-ride`, et « Le prochain bus de nuit », `night-ride`).
+- `js/core/` : ce qui est commun (position, destination, stockage, feuilles, champ d'adresse, géocodage).
 
-`js/app.js` choisit la ville et le type d'information (automatiquement ou via les sélecteurs de l'en-tête) et monte le module correspondant. Les interfaces sont détaillées dans [CONTEXT.md](CONTEXT.md), section 4.
+`js/app.js` choisit la ville et le mode (automatiquement ou via les sélecteurs de l'en-tête) et monte le module correspondant. Les interfaces sont détaillées dans [CONTEXT.md](CONTEXT.md), section 4.
 
 ### Ajouter un réseau
 
-1. Créez `js/networks/<id>/index.js` sur le modèle de `bordeaux-tbm/index.js` : `id`, `city`, `name`, `coverage`, `area`, `lineColors`, `attribution` et, dans `features`, un adaptateur par type d'information fourni.
+1. Créez `js/networks/<id>/index.js` sur le modèle de `bordeaux-tbm/index.js` : `id`, `city`, `name`, `coverage`, `area`, `lineColors`, `attribution` et, dans `features`, un adaptateur par mode fourni.
 2. Placez le code propre à son API à côté (par exemple `siri-lite.js` pour TBM).
 3. Inscrivez-le dans `NETWORKS` (`js/networks/index.js`).
 4. Lancez `npm test` : `tests/registry.test.mjs` vérifie que la configuration est complète.
 
-### Ajouter un type d'information
+### Ajouter un mode
 
 1. Créez `js/features/<id>/index.js` qui exporte `{ id, title, short, description, mount }`. `mount({ root, network, adapter })` dessine dans `<main>` et renvoie `{ unmount() }`, qui libère minuteries et écouteurs.
 2. Mettez sa logique de calcul dans un module pur à côté, avec des tests.
@@ -116,19 +126,27 @@ Le site est découpé en trois couches pour accueillir d'autres villes et d'autr
 index.html                           coquille HTML : fond d'ambiance, en-tête, <main>, feuille, pied de page
 mentions-legales.html                mentions légales
 confidentialite.html                 données personnelles et bouton d'effacement (js/legal.js)
-fonts/                               polices woff2 et licences OFL
+vendor/leaflet/                      Leaflet 1.9.4 (carte), copié tel quel avec sa licence
 css/style.css                        styles et jetons de design
 js/app.js                            choix de la ville et de l'information, montage
-js/core/                             position, domicile, stockage, feuilles, adresses, utilitaires
+js/core/                             position, destination, stockage, feuilles, adresses, utilitaires
 js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)
+tools/build-shapes.mjs               génération du tracé des lignes depuis le GTFS (npm run shapes)
 tools/serve.py                       serveur local sans cache (npm run serve)
 lab/                                page de tests locale (heure simulée, écrans forcés), jamais publiée
-js/features/index.js                 registre des types d'information
-js/features/last-ride/               « Le dernier tram pour rentrer » : écrans et calcul pur
+js/features/index.js                 registre des modes
+js/themes/                           thèmes de saison (calendrier dans index.js, un dossier par thème)
+js/core/season.js                    application du thème de saison actif
+THEMES.md                            calendrier des thèmes et procédure pour en ajouter un
+js/features/last-ride/               « Le dernier tram » : écrans et calcul pur
+js/features/night-ride/              « Le prochain bus de nuit » (TBNight), même écran
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
-tests/registry.test.mjs              tests des registres et du stockage du domicile
+tests/registry.test.mjs              tests des registres et du stockage de la destination
+tests/walk-route.test.mjs            tests de l'itinéraire piéton (réponse IGN, nouvel essai, temps de marche)
+tests/line-trace.test.mjs            tests des tracés de lignes (encodage, découpage, couverture TBM)
+tests/themes.test.mjs                tests du calendrier des thèmes (dates, fichiers, accord avec THEMES.md)
 ```
 
 Les consignes de conception, les formats des API et les limites vérifiées sont détaillés dans [CONTEXT.md](CONTEXT.md).
