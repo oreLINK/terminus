@@ -94,7 +94,7 @@ Seule Bordeaux Métropole est couverte pour le moment. Chaque nouvelle ville aur
 | | Train (TER) | 🔴 | |
 | **Fonctionnalités** | Compte à rebours avant de partir | 🟢 | |
 | | Temps réel quand il est disponible | 🟢 | |
-| | Correspondances (jusqu'à deux) | 🟢 | Dans une même station |
+| | Correspondances (jusqu'à deux) | 🟢 | Dans une même station ou à pied entre deux arrêts proches |
 | | Deux trajets au choix (Plus pratique, Plus tard possible) | 🟢 | Mode « Le dernier tram » |
 | | Détail du trajet, étape par étape | 🟢 | |
 | | Carte, avec le vrai tracé des lignes | 🟢 | Fond Plan IGN |
