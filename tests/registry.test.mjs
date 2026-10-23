@@ -16,7 +16,7 @@ const { getHome, saveHome } = await import("../js/core/home.js");
 // Tous les adaptateurs « dernier trajet » (tram, bus de nuit) : ils partagent l'écran de last-ride.
 const rideAdapters = () =>
   NETWORKS.flatMap((n) =>
-    ["last-ride", "night-ride"].filter((id) => n.features[id]).map((id) => ({ n, id, a: n.features[id] })),
+    ["last-ride", "last-bus", "night-ride"].filter((id) => n.features[id]).map((id) => ({ n, id, a: n.features[id] })),
   );
 
 test("chaque réseau est complet et ne déclare que des modes connus", () => {
@@ -130,7 +130,7 @@ test("la ville est choisie d'après la position", () => {
   assert.equal(networkAt({ lat: 44.8378, lon: -0.5792 })?.id, "bordeaux-tbm"); // place de la Comédie
   assert.equal(networkAt({ lat: 48.8566, lon: 2.3522 }), null); // Paris : aucun réseau
   assert.equal(networkAt(null), null);
-  assert.deepEqual(featuresFor(getNetwork("bordeaux-tbm")).map((f) => f.id), ["last-ride", "night-ride"]);
+  assert.deepEqual(featuresFor(getNetwork("bordeaux-tbm")).map((f) => f.id), ["last-ride", "last-bus", "night-ride"]);
 });
 
 test("le domicile est rangé par réseau et l'ancienne adresse est reprise", () => {

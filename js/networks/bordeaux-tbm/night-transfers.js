@@ -1,6 +1,7 @@
 // Généré par tools/build-transfers.mjs (npm run transfers). Ne pas modifier à la main.
-// Correspondances à pied TBNight entre stations proches de noms différents (moins de 400 m,
-// changement de ligne), marche par les rues calculée par l'IGN à la génération. Lu par transferMap
+// Correspondances à pied TBNight entre stations proches de noms différents (moins de 400 m
+// à vol d'oiseau, au plus 600 m de marche, changement de ligne), marche par les rues calculée par
+// l'IGN à la génération. Lu par transferMap
 // (js/features/last-ride/planner.js) : [station A, station B, mètres, tracé encodé (encodeLine) ou null
 // si l'IGN n'a pas répondu (estimation)]. Identifiants des stations : buildIndex(night-stops.js).
 
@@ -22,5 +23,10 @@ export default {
     ["saint michel","salinieres",482,[4483446,-56304,43,-44,-21,-35,43,-48,-19,-32,126,-175,-8,-46,-25,-64]], // Saint Michel ↔ Salinières
     ["tourny","quinconces",420,[4484563,-57765,-36,-29,-6,18,-13,1,18,178,-34,20,-26,46,-7,53,8,87]], // Tourny ↔ Quinconces
     ["victoire somme","victoire",214,[4482983,-57235,67,-14,-6,-25,6,-16,43,-27,16,-59]], // Victoire (Somme) ↔ Victoire
+  ],
+  // Paires écartées, marche de plus de 600 m : [station A, station B, mètres] (non utilisées,
+  // gardées pour ne pas les redemander à l'IGN à la prochaine génération).
+  tooLong: [
+
   ],
 };

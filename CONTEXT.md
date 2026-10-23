@@ -9,7 +9,7 @@ Document de passation. Il décrit le projet, ses choix et son état pour qu'un d
 
 - Nom de projet interne : « Last TBM ». Nom public : **Terminus**, slogan « Le dernier tram pour rentrer ».
 - Ne pas utiliser « TBM » dans le nom public : c'est la marque du réseau (Keolis pour Bordeaux Métropole). Le site est indépendant et le dit dans son pied de page.
-- Périmètre actuel : **un réseau (TBM, Bordeaux), deux modes : « Le dernier tram » (`last-ride`, trams des lignes A à F) et « Le prochain bus de nuit » (`night-ride`, bus TBNight), trajets directs ou avec une ou deux correspondances dans une même station, chaque mode calculé séparément.** L'architecture accueille d'autres réseaux et d'autres modes (section 4).
+- Périmètre actuel : **un réseau (TBM, Bordeaux), trois modes : « Le dernier tram » (`last-ride`, trams des lignes A à F), « Le dernier bus » (`last-bus`, 62 lignes de bus de jour qui roulent le soir) et « Le prochain bus de nuit » (`night-ride`, bus TBNight), trajets directs ou avec une ou deux correspondances, dans une même station ou à pied entre stations proches, chaque mode calculé séparément.** L'architecture accueille d'autres réseaux et d'autres modes (section 4).
 
 ## 2. Contraintes non négociables
 
@@ -69,7 +69,7 @@ Rafraîchissement : recalcul toutes les 30 s quand l'onglet est visible, et au r
 - **Fonctionnalité** : ce que propose un mode (compte à rebours, temps réel, carte, choix du trajet…).
 - **Destination** (anciennement « Domicile », renommée le 22/10/2026) : l'adresse où la personne veut aller. Dans le code, elle reste `home` (`getHome`, `saveHome`, `state.home`, clé `dt.homes.v1`), pour garder les adresses déjà enregistrées. Le slogan du site reste « le dernier tram pour rentrer chez vous ».
 
-Terminus est organisé pour accueillir plusieurs **réseaux** (une compagnie de transport, une ville) et plusieurs **modes** (aujourd'hui deux : « Le dernier tram », `last-ride`, et « Le prochain bus de nuit », `night-ride`). Dans le code, un mode est encore appelé *feature* (`js/features/`, `FEATURES`, `DEFAULT_FEATURE`, `network.features`) : seul le vocabulaire de l'interface et de la documentation a changé.
+Terminus est organisé pour accueillir plusieurs **réseaux** (une compagnie de transport, une ville) et plusieurs **modes** (aujourd'hui trois : « Le dernier tram », `last-ride`, « Le dernier bus », `last-bus`, et « Le prochain bus de nuit », `night-ride`). Dans le code, un mode est encore appelé *feature* (`js/features/`, `FEATURES`, `DEFAULT_FEATURE`, `network.features`) : seul le vocabulaire de l'interface et de la documentation a changé.
 
 - **Réseau** (`js/networks/<id>/index.js`) : un objet de configuration. Il décrit la ville (`id`, `city`, `name`), sa zone desservie (`coverage`, boîte qui sert au choix automatique de la ville), la zone des adresses (`area` : département pour la Géoplateforme, boîte, centre, exemple d'adresse), les couleurs de lignes, les mentions de source (`attribution`) et, dans `features`, **un adaptateur par mode qu'il sait fournir**. Le code propre à l'API du réseau vit à côté (pour TBM : `siri-lite.js`).
 - **Mode** (`js/features/<id>/index.js`) : exporte `{ id, title, short, description, mount }`. `mount({ root, network, adapter })` dessine dans `<main>` et renvoie `{ unmount() }`, qui doit tout libérer (minuteries, écouteurs, abonnement à la position). Sa logique de calcul pure vit à côté (pour `last-ride` : `planner.js`).
@@ -108,12 +108,14 @@ js/networks/bordeaux-tbm/graph.js   graphe du réseau (généré, versionné) : 
 js/networks/bordeaux-tbm/stops.js   lignes et arrêts de tram (généré, versionné) : chargés sans appel à l'API
 js/networks/bordeaux-tbm/night-stops.js, night-graph.js  mêmes fichiers pour TBNight (npm run graph -- --night)
 tools/build-graph.mjs               génère stops.js et graph.js depuis l'API (npm run graph ; -- --stops-only)
-tools/build-transfers.mjs           génère transfers.js et night-transfers.js, correspondances à pied (npm run transfers)
+tools/build-bus-network.mjs         génère bus-stops.js et bus-graph.js, bus de jour, depuis le GTFS (npm run bus)
+tools/build-transfers.mjs           génère transfers.js, night-transfers.js et bus-transfers.js, correspondances à pied, incrémental (npm run transfers)
 tools/build-shapes.mjs              génère shapes.js, le tracé réel des lignes, depuis le GTFS TBM (npm run shapes)
 tools/build-timetable.mjs           génère evening/, les horaires théoriques du soir, depuis le GTFS (npm run timetable)
 tools/compare-methods.mjs           compare l'ancienne et la nouvelle méthode de calcul sur le tram (npm run compare)
 tools/gtfs.mjs                      téléchargement et lecture du GTFS TBM, partagés par les générateurs
-js/networks/bordeaux-tbm/evening/   horaires du soir (générés, versionnés) : index.js et un day-<n>.js par type de jour
+js/networks/bordeaux-tbm/evening/   horaires du soir (générés, versionnés), un dossier par mode (tram, night, bus) : index.js et un day-<n>.js par type de jour
+js/networks/bordeaux-tbm/bus-*.js   bus de jour (générés) : bus-stops, bus-graph, bus-shapes, bus-transfers
 js/core/timetable.js                horaires théoriques au format du flux SIRI, fusion avec le temps réel (mergeLive)
 js/networks/bordeaux-tbm/shapes.js  tracés des lignes de tram et TBNight (généré, versionné), pour la carte
 js/core/walk-route.js               itinéraire piéton réel (IGN), file d'appels, realWalk
@@ -126,6 +128,7 @@ js/features/index.js                registre des modes, DEFAULT_FEATURE
 js/features/last-ride/index.js      « Le dernier tram » : écrans, calcul, feuilles
 js/features/last-ride/planner.js    logique pure : stations, candidats, options
 js/features/last-ride/route-map.js  carte du tracé affiché : aperçu figé de la tuile et carte de la feuille « Votre trajet »
+js/features/last-bus/index.js       « Le dernier bus » : l'écran de last-ride avec l'adaptateur des bus de jour
 js/features/night-ride/index.js     « Le prochain bus de nuit » : l'écran de last-ride avec l'adaptateur TBNight, but « next »
 tests/planner.test.mjs              tests du calcul et de la lecture SIRI-Lite
 tests/registry.test.mjs             cohérence des registres, choix de la ville, stockage de la destination
@@ -295,7 +298,15 @@ Intention : lisible d'une main, la nuit, dehors. **Un seul élément fort : le c
       - **Candidats ligne par ligne** (`candidateStations`) : la station la plus proche de chaque ligne dans le rayon, plus les plus proches (départ : 2 km, 2 au moins, 10 au plus ; arrivée : 1,5 km, 1 au moins, 8 au plus), au lieu des 8 plus proches. La marche réelle (IGN) n'est plus demandée que pour les stations qu'un trajet emprunte (`refineWalks`), malgré les candidats plus nombreux.
       - **Boucles écartées** (`loops`) : un trajet qui repasse par une station déjà visitée est rejeté (Gambetta → Gaviniès en « Plus tard possible » : F de Hôtel de Ville à Sainte-Catherine, marche, B pour revenir à Hôtel de Ville). Possible aussi avant l'étape 2, avec une correspondance dans la même station.
       - Mesure : `npm run compare` (qui calcule désormais comme l'appli) reste à 100 % d'accord sur les trajets bâtis sur de vraies courses, sans écart inexpliqué ; les correspondances à pied ne servent que rarement pour le tram (2 tracés sur 200), surtout le soir ; elles compteront pour les bus.
-    - **Étapes** : 1) horaires du soir générés et calcul hors ligne pour le mode tram, comparé à l'ancienne méthode (fait, à confirmer le soir) ; 2) correspondances à pied et candidats par ligne ; 3) mode « Le dernier bus » ; 4) mode « Le dernier transport » ; 5) mise à jour automatique ; 6) essais réels, puis bascule. Estimation : 5 à 6 jours de travail, essais réels en plus.
+    - **Étape 3, faite le 23/10/2026 : mode « Le dernier bus »** (`js/features/last-bus/index.js`, même écran et même calcul que le tram ; adaptateur `last-bus` de Bordeaux) :
+      - **Données tirées du GTFS, sans appel à SIRI** : `npm run bus` (`tools/build-bus-network.mjs`) génère `bus-stops.js` (62 lignes avec leur couleur officielle `route_color`, 3 105 quais, 70 Ko compressés) et `bus-graph.js` (233 motifs, 43 Ko, pour l'ancienne méthode seulement). Lignes : réseau `TBM` (les 50 lignes scolaires, réseau `TBMSCO` de `route_networks.txt`, sont écartées), type bus, hors TBNight, avec une course après 18 h dans les 21 jours. Puis `npm run transfers` : 767 correspondances à pied (836 paires trouvées, 69 écartées car la marche réelle dépasse 600 m, comme 1 153 m pour 368 m à vol d'oiseau), 35 Ko ; génération **incrémentale** (paires déjà calculées et paires écartées reprises du fichier, l'IGN n'est appelé que pour les nouvelles). `npm run shapes` : `bus-shapes.js`, 176 tracés pour 61 lignes (« Bus Relais A » n'a pas de tracé), 57 Ko, chargés avec la carte.
+      - **Un fichier par mode** (« un mode ne télécharge que ses lignes ») : horaires du soir dans `evening/tram/`, `evening/night/`, `evening/bus/` (bus : 21 types de jour, jusqu'à 51 Ko compressés par soir) ; index sans les noms des quais (repris des arrêts du mode, `nameOf`) : 0,8 Ko chacun au lieu de 25 Ko pour le bus ; le lendemain n'est chargé que si l'index le demande (`nextDay`, TBNight seulement). Tracés : `shapes.js` (tram et TBNight) et `bus-shapes.js`.
+      - **Nouvelle méthode d'emblée** (`method: "offline"`) : l'ancienne demanderait de 6 à 25 appels SIRI par calcul. Elle reste en secours, mais sans le dernier recours « tout le réseau » au-delà de 40 (ligne, sens) (`MAX_ALL_REQUESTS` : 124 pour les bus). Le graphe n'est chargé que si l'ancienne méthode sert ou pour les zones à la demande.
+      - **Couleurs des lignes** : celles des arrêts générés (`line.color`, `line.textColor`) l'emportent sur la table du réseau (`network.lineColors`, tram et TBNight) pour les badges, l'itinéraire et la carte (`lineColorOf`, `lineInkOf`).
+      - **Choix du trajet** : proposé seulement s'il fait gagner au moins 2 minutes (`MIN_GAIN_MS`, constaté avec les bus : « avant 00:57 » contre « avant 00:58 »).
+      - **Comparaison** (`npm run compare -- --mode last-bus`, 124 appels SIRI, outil de développement ; fenêtre jusqu'à l'horizon le plus lointain du flux, une ligne qui finit tôt ayant simplement fini) : courses communes 100 % de même sens, mêmes quais et mêmes heures ; aucun écart inexpliqué sur 160 tracés ; l'ancienne méthode s'appuie sur une course fantôme de SIRI dans 105 cas, la nouvelle trouve 12 fois un bus d'après minuit que SIRI n'a qu'à la date de la veille ; 22 tracés empruntent une correspondance à pied. Dans le site : 3 appels SIRI pour un trajet avec correspondance.
+      - Piste : `bus-stops.js` (70 Ko) pourrait maigrir en abrégeant les identifiants (« 3684 » au lieu de « bordeaux:StopPoint:BP:3684:LOC », reconstitués par `refs`).
+    - **Étapes** : 1) horaires du soir générés et calcul hors ligne pour le mode tram, comparé à l'ancienne méthode (fait, à confirmer le soir) ; 2) correspondances à pied et candidats par ligne (fait) ; 3) mode « Le dernier bus » (fait) ; 4) mode « Le dernier transport » ; 5) mise à jour automatique ; 6) essais réels, puis bascule. Estimation : 5 à 6 jours de travail, essais réels en plus.
 
 ## 12. Conventions de code
 

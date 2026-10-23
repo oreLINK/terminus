@@ -8,8 +8,9 @@ import { zonedTime } from "./util.js";
 
 // Courses d'un jour de service. `refs` traduit les identifiants GTFS en identifiants SIRI du réseau :
 // { line(route_id), stop(stop_id), journey(trip_id) }. `lines` : les lignes à garder (Set de refs
-// SIRI), facultatif. Les heures GTFS comptent depuis « midi moins 12 h » du jour de service.
-export function buildJourneys(index, day, date, refs, lines = null) {
+// SIRI), facultatif. `nameOf(ref SIRI)` : nom d'un quai (les arrêts du mode, déjà chargés ; les
+// horaires ne répètent pas les noms). Les heures GTFS comptent depuis « midi moins 12 h » du jour.
+export function buildJourneys(index, day, date, refs, lines = null, nameOf = (ref) => ref) {
   const base = zonedTime(`${date} 12:00`, index.timeZone) - 12 * 3600 * 1000;
   const out = [];
   for (const [tripId, pi, qi, start] of day.trips) {
@@ -21,23 +22,26 @@ export function buildJourneys(index, day, date, refs, lines = null) {
     const calls = stops.map((id, k) => {
       if (k) t += deltas[k];
       const ms = base + t * 1000;
-      return { ref: refs.stop(id), name: index.stops[id] ?? id, dep: ms, depLive: false, arr: ms, arrLive: false, cancelled: false };
+      const ref = refs.stop(id);
+      return { ref, name: nameOf(ref), dep: ms, depLive: false, arr: ms, arrLive: false, cancelled: false };
     });
     out.push({ id: refs.journey(tripId), line, direction: String(direction), headsign: calls[calls.length - 1].name, calls, theoretical: true });
   }
   return out;
 }
 
-// Courses théoriques des jours donnés (le soir, et le lendemain pour les bus de nuit, que le GTFS
-// range sur le jour du matin), ou null si un jour manque : fichier périmé, l'appelant revient alors
-// à l'ancienne méthode. `source` : { loadIndex(), loadDay(type), refs }.
-export async function eveningJourneys(source, dates, lines = null) {
+// Courses théoriques du soir `evening` (AAAA-MM-JJ), et du lendemain `nextDate` si les horaires le
+// demandent (`nextDay` : bus de nuit, que le GTFS range sur le jour du matin), ou null si un jour
+// manque : fichier périmé, l'appelant revient alors à l'ancienne méthode. `source` : { loadIndex(),
+// loadDay(type), refs }.
+export async function eveningJourneys(source, evening, nextDate, lines = null, nameOf = undefined) {
   const index = await source.loadIndex();
   const out = [];
+  const dates = index?.nextDay ? [evening, nextDate] : [evening];
   for (const date of dates) {
     const type = index?.days?.[date];
     if (type == null) return null;
-    out.push(...buildJourneys(index, await source.loadDay(type), date, source.refs, lines));
+    out.push(...buildJourneys(index, await source.loadDay(type), date, source.refs, lines, nameOf));
   }
   return out;
 }

@@ -76,6 +76,8 @@ export function mount({ root, network, adapter, goal = "last" }) {
     index: null,
     graph: undefined, // graphe du réseau : undefined tant qu'il n'est pas chargé, null s'il n'y en a pas
     transfers: null, // correspondances à pied entre stations proches (transferMap), chargées avec les arrêts
+    names: new Map(), // nom de chaque quai (ref SIRI → nom), pour les horaires inclus
+    colors: new Map(), // couleurs des lignes données par les arrêts générés (bus) : code → { color, ink }
     lineCodes: {},
     timer: null,
     busy: false,
@@ -286,6 +288,10 @@ export function mount({ root, network, adapter, goal = "last" }) {
     if (state.index) return;
     const [data, transfers] = await Promise.all([adapter.loadStops(), adapter.loadTransfers?.().catch(() => null)]);
     state.index = buildIndex(data.stops);
+    state.names = new Map(data.stops.map((x) => [x.ref, x.name])); // noms des quais, pour les horaires inclus
+    state.colors = new Map(
+      Object.values(data.lines).filter((l) => l.color).map((l) => [l.code, { color: l.color, ink: l.textColor ?? "#FFFFFF" }]),
+    );
     state.lineCodes = Object.fromEntries(Object.values(data.lines).map((l) => [l.ref, l.code]));
     // Sans fichier de correspondances, on change seulement dans une même station, comme avant.
     state.transfers = transferMap(transfers?.rows, state.index, decodeLine);
@@ -307,11 +313,15 @@ export function mount({ root, network, adapter, goal = "last" }) {
   // Horaires à charger, par paliers du plus léger au réseau entier : le calcul s'arrête au premier
   // palier qui donne un trajet. Avec le graphe : le trajet le plus simple, puis une correspondance
   // de plus. Sans graphe : les lignes des deux côtés. Le dernier palier rattrape un graphe périmé.
+  // Le dernier recours (tout le réseau) n'est permis que pour un petit réseau : 12 (ligne, sens) pour
+  // le tram, mais 124 pour les bus de jour, autant d'appels d'un coup (MAX_ALL_REQUESTS).
+  const MAX_ALL_REQUESTS = 40;
   function loadStages(origins, dests) {
-    const all = bothWays(Object.keys(state.lineCodes));
-    if (!state.graph) return [bothWays(candidateLines(origins, dests)), all];
+    const everything = bothWays(Object.keys(state.lineCodes));
+    const all = everything.length <= MAX_ALL_REQUESTS ? [everything] : [];
+    if (!state.graph) return [bothWays(candidateLines(origins, dests)), ...all];
     const args = { graph: state.graph, index: state.index, origins, dests, transfers: state.transfers };
-    return [routeRequests(args), routeRequests({ ...args, extraTransfers: 1 }), all];
+    return [routeRequests(args), routeRequests({ ...args, extraTransfers: 1 }), ...all];
   }
 
   // Les courses des (ligne, sens) demandés, jusqu'à la fin du service. Un échec partiel est signalé
@@ -344,7 +354,10 @@ export function mount({ root, network, adapter, goal = "last" }) {
     const shown = visible || !state.lastComputedFrom;
     if (shown) setComputing(true, "Calcul du trajet…");
     try {
-      await Promise.all([ensureStops(), ensureGraph()]);
+      // Méthode de calcul : celle du réseau, ou celle que le mode test force. Le graphe ne sert qu'à
+      // l'ancienne méthode et aux zones à la demande : la nouvelle ne le charge pas (bus : 43 Ko).
+      const method = lab?.method ?? adapter.method ?? "siri";
+      await Promise.all([ensureStops(), method !== "offline" || adapter.zones ? ensureGraph() : null]);
       if (state.unmounted) return;
 
       if (walkBetween(here, state.home).straight < 300) {
@@ -373,18 +386,17 @@ export function mount({ root, network, adapter, goal = "last" }) {
       let now = clockNow();
       const serviceEnd =
         endHour == null ? Infinity : serviceEndAfter(now, { timeZone: network.timeZone, hour: endHour });
-      const stages = loadStages(origins, dests);
-      // Nouvelle méthode (horaires théoriques inclus, temps réel ciblé) si le réseau la choisit
-      // (adapter.method) ou si le mode test la force, et que les horaires couvrent la soirée ; sinon,
-      // l'ancienne ci-dessous.
-      const method = lab?.method ?? adapter.method ?? "siri";
+      // Nouvelle méthode (horaires théoriques inclus, temps réel ciblé) si elle est choisie et que les
+      // horaires couvrent la soirée ; sinon, l'ancienne ci-dessous, avec le graphe chargé au besoin.
       const offline = method === "offline" ? await offlineJourneys(now, origins, dests, serviceEnd) : null;
+      if (!offline) await ensureGraph();
+      const stages = offline ? [] : loadStages(origins, dests);
       if (state.unmounted) return;
       if (offline) {
         ({ journeys, failed, result } = offline);
         now = clockNow();
       }
-      for (const stage of offline ? [] : stages) {
+      for (const stage of stages) {
         const todo = stage.filter((r) => !loaded.has(`${r.line}|${r.direction}`));
         if (result && !todo.length) continue;
         for (const r of todo) loaded.add(`${r.line}|${r.direction}`);
@@ -398,7 +410,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
       }
       // Avec les horaires théoriques, les courses passées sont connues : le calcul voit seul que le
       // dernier est parti, sans cette déduction.
-      const overHint = Boolean(!offline && state.graph && stages[0].length);
+      const overHint = Boolean(!offline && state.graph && stages[0]?.length);
       // Mode test : la méthode réellement utilisée, lisible par la page d'essai et le bandeau.
       if (lab) document.documentElement.dataset.method = offline ? "offline" : "siri";
       state.lastComputedFrom = here;
@@ -429,7 +441,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
     const evening = addDays(morning(), -1);
     let journeys;
     try {
-      journeys = await eveningJourneys(adapter.evening, [isoDate(evening), isoDate(addDays(evening, 1))], new Set(Object.keys(state.lineCodes)));
+      journeys = await eveningJourneys(adapter.evening, isoDate(evening), isoDate(addDays(evening, 1)), new Set(Object.keys(state.lineCodes)), (ref) => state.names.get(ref) ?? ref);
     } catch {
       return null;
     }
@@ -555,11 +567,16 @@ export function mount({ root, network, adapter, goal = "last" }) {
 
   // ---------- Rendu ----------
 
+  // Couleur officielle d'une ligne : celle des arrêts générés (bus, avec leur couleur GTFS), sinon la
+  // table du réseau (tram, TBNight) ; texte du badge assorti.
+  const lineColorOf = (code) => state.colors.get(code)?.color ?? network.lineColors?.[code];
+  const lineInkOf = (code) => state.colors.get(code)?.ink ?? network.lineInk ?? "#FFFFFF";
+
   const badges = (codes) =>
     codes
       .map((c) => {
-        const color = network.lineColors?.[c];
-        const style = color ? ` style="--line: ${color}; --line-ink: ${network.lineInk ?? "#FFFFFF"}"` : "";
+        const color = lineColorOf(c);
+        const style = color ? ` style="--line: ${color}; --line-ink: ${lineInkOf(c)}"` : "";
         return `<span class="line-badge"${style} aria-label="${esc(adapter.vehicle)} ${esc(c)}">${esc(c)}</span>`;
       })
       .join("");
@@ -570,7 +587,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
     const trip = option.last;
     const legs = trip.legs;
     const final = legs[legs.length - 1];
-    const lineColor = (code) => network.lineColors?.[code] ?? "var(--ink)";
+    const lineColor = (code) => lineColorOf(code) ?? "var(--ink)";
     const seg = (kind) =>
       kind === "walk"
         ? `<span class="rail-seg is-walk"></span>`
@@ -694,9 +711,14 @@ export function mount({ root, network, adapter, goal = "last" }) {
 
   // Tracé affiché : celui du mode choisi. Sans tracé « pratique » (service terminé), le plus tard.
   // Sans choix affiché (les deux partent à la même heure), le plus pratique.
+  // Le choix n'est proposé que s'il fait gagner au moins 2 minutes : en deçà, c'est du bruit.
+  const MIN_GAIN_MS = 2 * 60 * 1000;
   const offersChoice = (result) =>
     goal === "last" &&
-    result?.comfortable && result.primary && result.primary.leaveBy > result.comfortable.leaveBy && !sameTrip(result.comfortable, result.primary);
+    result?.comfortable &&
+    result.primary &&
+    result.primary.leaveBy - result.comfortable.leaveBy >= MIN_GAIN_MS &&
+    !sameTrip(result.comfortable, result.primary);
   const chosen = (result) =>
     goal === "next"
       ? result?.soonest || result?.primary || null
@@ -706,7 +728,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
   const walkToMin = (option) => option.origin.walk.minutes + WALK_MARGIN_MS / 60000;
   const transfersText = (option) =>
     option.transfers === 0 ? "direct" : `${option.transfers} correspondance${option.transfers > 1 ? "s" : ""}`;
-  const mapLineColor = (code) => network.lineColors?.[code] ?? "currentColor";
+  const mapLineColor = (code) => lineColorOf(code) ?? "currentColor";
 
   // Résumé du trajet en deux lignes, à lire d'un coup d'œil : où marcher, puis quel tram jusqu'où.
   function summaryHtml(option) {

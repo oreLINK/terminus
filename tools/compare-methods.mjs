@@ -1,4 +1,4 @@
-// Compare, pour le mode tram, l'ancienne méthode (horaires SIRI par ligne) et la nouvelle (horaires
+// Compare, pour un mode (le tram par défaut), l'ancienne méthode (horaires SIRI par ligne) et la nouvelle (horaires
 // théoriques inclus, evening/) : c'est le test de fiabilité de l'étape 1 (CONTEXT.md, section 11,
 // piste 10). Deux parties :
 //   1. les données : chaque course SIRI doit exister dans les horaires inclus, avec le même sens, les
@@ -6,27 +6,31 @@
 //      fenêtre est signalée (supprimée ce jour-là, ou décalage des données) ;
 //   2. les trajets : sur des couples (position, destination) tirés au hasard, le tracé « le plus
 //      tard » et « le prochain » des deux méthodes, comparés course par course.
-// Usage : npm run compare [-- --pairs 60] [-- --seed 7]. Douze appels SIRI (tous les trams, deux
-// sens). Le soir, le temps réel explique les écarts d'heure ; une course différente est un écart à
+// Usage : npm run compare [-- --mode last-bus] [-- --pairs 60] [-- --seed 7]. Un appel SIRI par
+// (ligne, sens) du mode : 12 pour le tram, 124 pour les bus de jour. Le soir, le temps réel explique les écarts d'heure ; une course différente est un écart à
 // examiner. En journée, la comparaison s'arrête à l'horizon du flux SIRI (environ 12 h).
 
 import tbm from "../js/networks/bordeaux-tbm/index.js";
-import stopsData from "../js/networks/bordeaux-tbm/stops.js";
 import { loadTimetable } from "../js/networks/bordeaux-tbm/siri-lite.js";
 import { buildIndex, candidateStations, transferMap, plan, serviceEndAfter, serviceMorning, addDays } from "../js/features/last-ride/planner.js";
 import { decodeLine } from "../js/core/line-trace.js";
 import { eveningJourneys, isoDate } from "../js/core/timetable.js";
 import { zonedTime } from "../js/core/util.js";
 
-const arg = (name, fallback) => {
+const raw = (name) => {
   const i = process.argv.indexOf(`--${name}`);
-  return i > 0 ? Number(process.argv[i + 1]) : fallback;
+  return i > 0 ? process.argv[i + 1] : undefined;
 };
+const arg = (name, fallback) => (raw(name) != null ? Number(raw(name)) : fallback);
+const MODE = raw("mode") ?? "last-ride";
 const PAIRS = arg("pairs", 60);
 let seed = arg("seed", 7);
 const random = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
 
-const adapter = tbm.features["last-ride"];
+const adapter = tbm.features[MODE];
+if (!adapter?.evening) throw new Error(`Mode inconnu ou sans horaires inclus : ${MODE}`);
+const stopsData = await adapter.loadStops();
+console.log(`Mode ${MODE}.`);
 const tz = tbm.timeZone;
 const lines = Object.keys(stopsData.lines);
 const lineCodes = Object.fromEntries(Object.values(stopsData.lines).map((l) => [l.ref, l.code]));
@@ -50,16 +54,18 @@ for (const line of lines) {
 const cancellations = live.filter((j) => j.cancelled);
 live.splice(0, live.length, ...live.filter((j) => !j.cancelled));
 const evening = addDays(serviceMorning(now, { timeZone: tz, hour: adapter.serviceEndHour }), -1);
-const theo = await eveningJourneys(adapter.evening, [isoDate(evening), isoDate(addDays(evening, 1))], new Set(lines));
+const names = new Map(stopsData.stops.map((x) => [x.ref, x.name]));
+const theo = await eveningJourneys(adapter.evening, isoDate(evening), isoDate(addDays(evening, 1)), new Set(lines), (ref) => names.get(ref) ?? ref);
 if (!theo) throw new Error("Les horaires inclus ne couvrent pas cette soirée : npm run timetable.");
 
-// Fenêtre commune : jusqu'à l'horizon du flux le plus court, et de 17 h (début des horaires inclus).
+// Fenêtre commune : de 17 h (début des horaires inclus) jusqu'à l'horizon du flux. L'horizon est le plus
+// lointain des (ligne, sens) : une ligne qui finit tôt a simplement fini (bus), ce n'est pas la limite du flux.
 const horizonOf = new Map();
 for (const j of live) {
   const k = `${j.line}|${j.direction}`;
   horizonOf.set(k, Math.max(horizonOf.get(k) ?? 0, j.calls[0].dep));
 }
-const horizon = Math.min(serviceEnd, ...horizonOf.values());
+const horizon = Math.min(serviceEnd, Math.max(...horizonOf.values()));
 // Les horaires inclus couvrent la soirée à partir de 17 h : en journée, on compare comme s'il était 17 h.
 const since = Math.max(now, zonedTime(`${isoDate(evening)} 17:00`, tz));
 console.log(`Soirée du ${isoDate(evening)}, comparaison de ${fmt(since)} à ${fmt(horizon)} (fin du service ${fmt(serviceEnd)}).`);

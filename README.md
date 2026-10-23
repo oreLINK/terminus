@@ -62,7 +62,13 @@ npm run timetable
 npm run compare   # compare les deux méthodes sur le tram : à lancer de préférence le soir
 ```
 
-`js/networks/bordeaux-tbm/transfers.js` et `night-transfers.js` contiennent les correspondances à pied entre stations proches de noms différents, avec leur marche par les rues calculée une fois par l'IGN. Relancez-les après `npm run graph` (les stations viennent des arrêts) :
+Les bus de jour (`bus-stops.js`, `bus-graph.js`) sont tirés du GTFS, sans appel au flux SIRI : 62 lignes qui roulent le soir, hors lignes scolaires.
+
+```sh
+npm run bus
+```
+
+`js/networks/bordeaux-tbm/transfers.js` , `night-transfers.js` et `bus-transfers.js` contiennent les correspondances à pied entre stations proches de noms différents, avec leur marche par les rues calculée une fois par l'IGN. Relancez-les après `npm run graph` et `npm run bus` (les stations viennent des arrêts) ; la génération est incrémentale, l'IGN n'est appelé que pour les nouvelles paires :
 
 ```sh
 npm run transfers
@@ -116,7 +122,7 @@ GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossi
 Le site est découpé en trois couches pour accueillir d'autres villes et d'autres informations :
 
 - `js/networks/` : un dossier par réseau de transport (ville, zone, couleurs de lignes, sources, adaptateurs d'API).
-- `js/features/` : un dossier par mode (aujourd'hui deux : « Le dernier tram », `last-ride`, et « Le prochain bus de nuit », `night-ride`).
+- `js/features/` : un dossier par mode (aujourd'hui trois : « Le dernier tram », `last-ride`, « Le dernier bus », `last-bus`, et « Le prochain bus de nuit », `night-ride`).
 - `js/core/` : ce qui est commun (position, destination, stockage, feuilles, champ d'adresse, géocodage).
 
 `js/app.js` choisit la ville et le mode (automatiquement ou via les sélecteurs de l'en-tête) et monte le module correspondant. Les interfaces sont détaillées dans [CONTEXT.md](CONTEXT.md), section 4.
@@ -147,6 +153,7 @@ js/core/                             position, destination, stockage, feuilles, 
 js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)
+tools/build-bus-network.mjs          génération des arrêts et du graphe des bus de jour depuis le GTFS (npm run bus)
 tools/build-transfers.mjs            génération des correspondances à pied (npm run transfers)
 tools/build-shapes.mjs               génération du tracé des lignes depuis le GTFS (npm run shapes)
 tools/build-timetable.mjs            génération des horaires du soir depuis le GTFS (npm run timetable)
@@ -158,6 +165,7 @@ js/themes/                           thèmes de saison (calendrier dans index.js
 js/core/season.js                    application du thème de saison actif
 THEMES.md                            calendrier des thèmes et procédure pour en ajouter un
 js/features/last-ride/               « Le dernier tram » : écrans et calcul pur
+js/features/last-bus/                « Le dernier bus » (bus de jour), même écran
 js/features/night-ride/              « Le prochain bus de nuit » (TBNight), même écran
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
 tests/registry.test.mjs              tests des registres et du stockage de la destination
