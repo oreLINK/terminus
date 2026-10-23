@@ -1,9 +1,10 @@
-// Type d'information « Le dernier tram pour rentrer » : combien de temps avant de devoir partir
+// Mode « Le dernier tram » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, serviceMorning, addDays, communeOf, zoneDests, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, serviceMorning, addDays, communeOf, zoneDests, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { createAddressField } from "../../core/address-field.js";
-import { clock, walkBetween, walkLink, esc } from "../../core/util.js";
+import { clock, walkBetween, walkLink, esc, distanceM } from "../../core/util.js";
+import { fetchWalk, realWalk } from "../../core/walk-route.js";
 import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
 import { setComputing } from "../../core/computing.js";
@@ -11,6 +12,9 @@ import { setAmbient } from "../../core/ambient.js";
 import { getHome, saveHome } from "../../core/home.js";
 import { covers } from "../../networks/index.js";
 import { lab, now as clockNow } from "../../core/lab.js";
+import { readJSON, writeJSON } from "../../core/storage.js";
+import { seasonText } from "../../core/season.js";
+import { createRouteMap } from "./route-map.js";
 
 const REFRESH_MS = 30 * 1000;
 const MOVE_THRESHOLD_M = 150;
@@ -28,6 +32,13 @@ const LIVE_MIN = 60;
 const ROUTE_MAX_AGE_MS = 100 * 1000;
 const OTHER_MAX_AGE_MS = 15 * 60 * 1000;
 
+// Tracé affiché quand les deux diffèrent : « Plus pratique » (par défaut) ou « Plus tard possible »,
+// au choix en haut de la tuile. Le choix est gardé dans ce navigateur, pour tous les réseaux.
+const MODE_KEY = "dt.route-mode.v1";
+const MODES = ["comfortable", "latest"];
+// Adresse du domicile masquée dans sa pastille (par défaut), contre les regards par-dessus l'épaule.
+const HIDE_HOME_KEY = "dt.home-hidden.v1";
+
 // Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
 // une maison pour le domicile.
 const ICONS = {
@@ -35,6 +46,11 @@ const ICONS = {
   home: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>`,
   go: `<svg class="route-go-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7 7-16Z"/></svg>`,
   refresh: `<svg class="meta-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>`,
+  walk: `<svg class="summary-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4.5" r="1.8"/><path d="M12.5 8 10 14l3.5 3 1.5 4.5M10 14l-2 7M11.5 9.5 8 12v3M13 8.5l2.5 3.5H19"/></svg>`,
+  expand: `<svg class="expand-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></svg>`,
+  // Œil : afficher l'adresse ; œil barré : la masquer (l'action que fait le bouton de l'en-tête).
+  eye: `<svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  eyeOff: `<svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5.8c.6-.2 1.3-.3 2-.3 6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.3 7.3A16.5 16.5 0 0 0 2.5 12S6 18.5 12 18.5c1.8 0 3.3-.5 4.6-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2M3.5 3.5l17 17"/></svg>`,
 };
 
 // Barre fine où glisse un segment, comme un tram sur sa ligne : visible pendant un calcul.
@@ -42,15 +58,17 @@ const PROGRESS = `<div class="progress" aria-hidden="true"></div>`;
 
 export default {
   id: "last-ride",
-  title: "Le dernier tram pour rentrer",
+  title: "Le dernier tram",
   short: "Dernier tram",
-  description: "Combien de temps il vous reste avant de partir pour attraper le dernier tram vers chez vous.",
+  description: "Quand partir pour attraper le dernier tram jusqu'à votre destination, et par où passer.",
   mount,
 };
 
-// Monté aussi par d'autres types d'information (night-ride : TBNight) : tout ce qui dépend du
+// Monté aussi par d'autres modes (night-ride : TBNight) : tout ce qui dépend du
 // véhicule vient de l'adaptateur (vehicle, plage horaire, nuits de service, zones à la demande).
-export function mount({ root, network, adapter }) {
+// `goal` : « last », le dernier départ qui ramène encore (choix « Plus pratique » / « Plus tard
+// possible ») ; « next », le prochain départ atteignable, sans choix (le prochain bus de nuit).
+export function mount({ root, network, adapter, goal = "last" }) {
   const state = {
     home: getHome(network),
     index: null,
@@ -67,7 +85,14 @@ export function mount({ root, network, adapter }) {
     entered: false, // l'écran est apparu une fois : les rendus suivants ne rejouent pas l'apparition
     asleep: false, // hors de la plage horaire du réseau : écran d'attente, aucun calcul
     quietUntil: null, // heure limite à plus d'1 h : pas de rafraîchissement automatique avant cette heure
-    routeLines: new Set(), // lignes du tracé affiché : leurs horaires sont rechargés plus souvent
+    routeLines: new Set(), // lignes des tracés proposés : leurs horaires sont rechargés plus souvent
+    mode: readJSON(MODE_KEY) === "latest" ? "latest" : "comfortable",
+    routeMap: null, // aperçu de carte de la tuile, créé au premier compte à rebours et gardé entre les rendus
+    detailMap: null, // carte de la feuille « Votre trajet », tant qu'elle est ouverte
+    // Marches réelles (IGN), par station : depuis la position (gardées tant qu'on reste à moins de
+    // 150 m de `anchor`) et jusqu'à la destination (tant qu'elle ne change pas).
+    walks: { origins: null, dests: null },
+    homeHidden: readJSON(HIDE_HOME_KEY) !== false, // adresse masquée dans la pastille, sauf choix contraire
     unmounted: false,
   };
 
@@ -78,6 +103,10 @@ export function mount({ root, network, adapter }) {
   const endHour = lab?.endHour ?? adapter.serviceEndHour;
   const liveMs = (lab?.liveMin ?? LIVE_MIN) * 60000;
   const V = adapter.vehicle; // « tram », « bus de nuit »
+  const which = goal === "next" ? "prochain" : "dernier";
+  // Le prochain bus de nuit peut passer des heures après le début du compte à rebours : seule la fin
+  // du service (serviceEnd) borne la soirée.
+  const serviceGap = goal === "next" ? Infinity : SERVICE_GAP_MS;
 
   // Nuits de service (TBNight : jeudi, vendredi, samedi et veilles de fêtes), jugées sur le matin de
   // la nuit en cours. Sans `runsOn`, le véhicule circule tous les jours.
@@ -98,7 +127,7 @@ export function mount({ root, network, adapter }) {
   function showWaitingForHome() {
     state.last = null;
     renderScreen({
-      hero: heroPending("Ajoutez votre domicile pour lancer le calcul."),
+      hero: heroPending("Ajoutez votre destination pour lancer le calcul."),
       meta: false,
     });
   }
@@ -157,7 +186,7 @@ export function mount({ root, network, adapter }) {
       hero: heroText(
         "En attente",
         `Dès ${start}`,
-        `Le compte à rebours du dernier ${esc(adapter.vehicle)} fonctionne de ${start} à ${hours(endHour)}.`,
+        `Le compte à rebours du ${which} ${esc(adapter.vehicle)} fonctionne de ${start} à ${hours(endHour)}.`,
       ),
       meta: false,
     });
@@ -315,7 +344,7 @@ export function mount({ root, network, adapter }) {
         return renderAtHome();
       }
 
-      const origins = nearestStations(state.index.stations, here, { radius: 2000, min: 2, max: 8 });
+      const origins = withRealWalks(nearestStations(state.index.stations, here, { radius: 2000, min: 2, max: 8 }), "origins", here);
       // Zones à la demande (TBNight) : si le domicile est dans une commune de zone, le dernier arrêt
       // fixe de la ligne y mène sans marche (on reste dans le bus), même s'il est aussi à portée à pied.
       const zones = zoneDests({
@@ -325,7 +354,7 @@ export function mount({ root, network, adapter }) {
         index: state.index,
         lineCodes: state.lineCodes,
       });
-      const near = nearestStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 5 });
+      const near = withRealWalks(nearestStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 5 }), "dests", state.home);
       const dests = [...near.filter((d) => !zones.some((z) => z.station.id === d.station.id)), ...zones];
       const loaded = new Set();
       let journeys = [];
@@ -344,18 +373,14 @@ export function mount({ root, network, adapter }) {
         journeys = journeys.concat(got.journeys);
         failed += got.failed;
         now = clockNow();
-        result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd });
+        result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd, serviceGap });
         if (result.options.length) break;
       }
-      // Les horaires ne couvrent que jusqu'à la fin du service : l'API ne renvoie alors presque plus
-      // les courses passées, et « le dernier tram est parti » ne se voit plus dans les données.
-      // Si le graphe relie les deux côtés et qu'il ne reste aucun tram, c'est que le dernier est parti.
-      if (result?.status === "none" && state.graph && stages[0].length) result = { ...result, status: "over" };
-      state.routeLines = new Set(result?.primary?.last.legs.map((l) => l.line) ?? []);
-
+      const overHint = Boolean(state.graph && stages[0].length);
       state.lastComputedFrom = here;
-      state.last = { result, origins, dests, now, partial: failed > 0 };
+      keep({ result: settle(result, overHint), origins, dests, now, partial: failed > 0, journeys, serviceEnd, overHint });
       renderLast();
+      refineWalks(here);
     } catch (err) {
       if (!state.unmounted) renderError(err);
     } finally {
@@ -370,6 +395,85 @@ export function mount({ root, network, adapter }) {
     }
   }
 
+  // Les horaires ne couvrent que jusqu'à la fin du service : l'API ne renvoie alors presque plus
+  // les courses passées, et « le dernier tram est parti » ne se voit plus dans les données.
+  // Si le graphe relie les deux côtés et qu'il ne reste aucun tram, c'est que le dernier est parti.
+  const settle = (result, overHint) => (result?.status === "none" && overHint ? { ...result, status: "over" } : result);
+
+  function keep(last) {
+    state.last = last;
+    const { result } = last;
+    state.routeLines = new Set(
+      [result?.primary, result?.comfortable, result?.soonest].flatMap((o) => o?.last.legs.map((l) => l.line) ?? []),
+    );
+  }
+
+  // ---------- Marche réelle ----------
+
+  // Marches connues d'un côté, remises à zéro quand le point de référence bouge : la position de plus
+  // de 150 m, la destination de plus de 20 m (nouvelle adresse).
+  function walksFor(side, from) {
+    const limit = side === "origins" ? MOVE_THRESHOLD_M : 20;
+    const known = state.walks[side];
+    if (!known || distanceM(known.anchor, from) > limit) {
+      state.walks[side] = { anchor: from, byId: new Map(), asked: new Set() };
+    }
+    return state.walks[side];
+  }
+
+  // Stations candidates avec leur marche réelle quand elle est connue, sinon l'estimation.
+  function withRealWalks(list, side, from) {
+    const { byId } = walksFor(side, from);
+    return list.map((x) => (byId.has(x.station.id) ? { ...x, walk: byId.get(x.station.id) } : x));
+  }
+
+  // Demande à l'IGN les marches encore inconnues (jusqu'aux arrêts autour de la position, depuis
+  // ceux autour de la destination ; pas pour les zones à la demande, sans marche), puis refait le
+  // calcul avec les horaires déjà chargés : l'heure limite, le choix de l'arrêt et la carte suivent
+  // les rues. Pendant ce temps, l'estimation reste affichée ; un échec la garde.
+  async function refineWalks(here) {
+    const { origins = [], dests = [] } = state.last ?? {};
+    const jobs = [];
+    const ask = (side, from, item, a, b) => {
+      const known = walksFor(side, from);
+      if (item.walk.real || item.zone || known.asked.has(item.station.id)) return;
+      known.asked.add(item.station.id);
+      jobs.push(
+        fetchWalk(a, b).then((route) => {
+          if (route && state.walks[side] === known) known.byId.set(item.station.id, realWalk(item.walk, route));
+          return Boolean(route);
+        }),
+      );
+    };
+    for (const o of origins) ask("origins", here, o, here, o.station);
+    for (const d of dests) ask("dests", state.home, d, d.station, state.home);
+    if (!jobs.length) return;
+    const got = await Promise.all(jobs);
+    if (got.some(Boolean)) replan();
+  }
+
+  // Nouveau calcul sur les horaires du dernier, avec les marches réelles connues. Sans effet si un
+  // calcul complet est en cours : il les appliquera lui-même.
+  function replan() {
+    const last = state.last;
+    if (state.unmounted || state.busy || !last?.journeys || !location.here) return;
+    const origins = withRealWalks(last.origins, "origins", location.here);
+    const dests = withRealWalks(last.dests, "dests", state.home);
+    const now = clockNow();
+    const result = plan({
+      origins,
+      dests,
+      journeys: last.journeys,
+      index: state.index,
+      lineCodes: state.lineCodes,
+      now,
+      serviceEnd: last.serviceEnd,
+      serviceGap,
+    });
+    keep({ ...last, result: settle(result, last.overHint), origins, dests, now });
+    renderLast();
+  }
+
   // ---------- Rendu ----------
 
   const badges = (codes) =>
@@ -381,7 +485,7 @@ export function mount({ root, network, adapter }) {
       })
       .join("");
 
-  // Itinéraire du dernier trajet, à la manière d'un calculateur d'itinéraire : une colonne d'heures,
+  // Itinéraire du trajet affiché, à la manière d'un calculateur d'itinéraire : une colonne d'heures,
   // un tracé (pointillé à pied, plein à la couleur de la ligne en tram) et les étapes.
   function routeHtml(option) {
     const trip = option.last;
@@ -421,11 +525,7 @@ export function mount({ root, network, adapter }) {
     legs.forEach((leg, i) => {
       const before = i === 0 ? "walk" : legs[i - 1].lineCode;
       const note = i === 0 ? "" : `<span class="route-note">correspondance</span>`;
-      // L'arrêt de départ se touche pour voir comment s'y rendre (feuille Arrêt de départ).
-      const name =
-        i === 0
-          ? `<button type="button" class="route-stop route-stop-button" data-action="open-station" aria-haspopup="dialog">${esc(leg.from.name)}<span class="visually-hidden">, s'y rendre</span></button>`
-          : `<strong class="route-stop">${esc(leg.from.name)}</strong>`;
+      const name = `<strong class="route-stop">${esc(leg.from.name)}</strong>`;
       steps.push(
         step({
           time: clock(leg.dep),
@@ -474,7 +574,7 @@ export function mount({ root, network, adapter }) {
             : "",
         }),
       );
-      return `<ol class="route" aria-label="Itinéraire du dernier trajet">${steps.join("")}</ol>`;
+      return `<ol class="route" aria-label="Itinéraire du trajet">${steps.join("")}</ol>`;
     }
     steps.push(
       step({
@@ -482,15 +582,83 @@ export function mount({ root, network, adapter }) {
         top: "walk",
         dot: "is-end",
         kind: "home",
-        body: `Domicile, ${trip.dest.walk.minutes} min à pied`,
+        body: `Destination, ${trip.dest.walk.minutes} min à pied`,
         // De la station d'arrivée jusqu'au domicile, dans Google Maps : le pendant du bouton de départ.
-        action: `<a class="route-go" href="${walkHome}" target="_blank" rel="noopener" aria-label="Itinéraire à pied de ${esc(final.to.name)} jusqu'au domicile (Google Maps)">${ICONS.go}</a>`,
+        action: `<a class="route-go" href="${walkHome}" target="_blank" rel="noopener" aria-label="Itinéraire à pied de ${esc(final.to.name)} jusqu'à la destination (Google Maps)">${ICONS.go}</a>`,
       }),
     );
-    return `<ol class="route" aria-label="Itinéraire du dernier trajet">${steps.join("")}</ol>`;
+    return `<ol class="route" aria-label="Itinéraire du trajet">${steps.join("")}</ol>`;
   }
 
-  const isEnded = (option, now) => option.next.dep - now > SERVICE_GAP_MS;
+  const isEnded = (option, now) => option.next.dep - now > serviceGap;
+
+  // Tracé affiché : celui du mode choisi. Sans tracé « pratique » (service terminé), le plus tard.
+  // Sans choix affiché (les deux partent à la même heure), le plus pratique.
+  const offersChoice = (result) =>
+    goal === "last" &&
+    result?.comfortable && result.primary && result.primary.leaveBy > result.comfortable.leaveBy && !sameTrip(result.comfortable, result.primary);
+  const chosen = (result) =>
+    goal === "next"
+      ? result?.soonest || result?.primary || null
+      : ((state.mode === "comfortable" || !offersChoice(result)) && result?.comfortable) || result?.primary || null;
+
+  // Marche jusqu'à l'arrêt de départ, marge comprise : l'écart réel entre l'heure limite et le tram.
+  const walkToMin = (option) => option.origin.walk.minutes + WALK_MARGIN_MS / 60000;
+  const transfersText = (option) =>
+    option.transfers === 0 ? "direct" : `${option.transfers} correspondance${option.transfers > 1 ? "s" : ""}`;
+  const mapLineColor = (code) => network.lineColors?.[code] ?? "currentColor";
+
+  // Résumé du trajet en deux lignes, à lire d'un coup d'œil : où marcher, puis quel tram jusqu'où.
+  function summaryHtml(option) {
+    const legs = option.last.legs;
+    const final = legs[legs.length - 1];
+    const zone = option.last.dest.zone;
+    return `
+      <span class="summary-line">${ICONS.walk}<span><strong>${walkToMin(option)} min</strong> à pied jusqu'à <strong class="summary-stop">${esc(legs[0].from.name)}</strong></span></span>
+      <span class="summary-line">${badges(legs.map((l) => l.lineCode))}<span><strong>${clock(legs[0].dep)}</strong> → <span class="summary-stop">${esc(final.to.name)}</span>${
+        zone ? ", puis zone à la demande" : ""
+      }${legs.length > 1 ? ` · ${transfersText(option)}` : ""}</span></span>`;
+  }
+
+  // Choix entre les deux tracés, en haut de la tuile, seulement si « Plus tard possible » laisse
+  // vraiment partir plus tard (deux trajets différents à la même heure limite : rien à choisir).
+  // Chaque choix montre son heure limite : ce que l'on gagne se lit d'un coup d'œil.
+  function modesHtml(result) {
+    const { comfortable, primary } = result;
+    if (!offersChoice(result)) return "";
+    const button = (mode, label, option) => `
+      <button type="button" class="route-mode" data-action="route-mode" data-value="${mode}" aria-pressed="${state.mode === mode}">
+        <span class="route-mode-label">${label}</span>
+        <span class="route-mode-time">avant ${clock(option.leaveBy)}</span>
+      </button>`;
+    // --active : position de la pastille qui glisse sous le choix en cours (0 à gauche, 1 à droite).
+    return `<div class="route-modes" role="group" aria-label="Trajet proposé" style="--active: ${MODES.indexOf(state.mode)}">${button("comfortable", "Plus pratique", comfortable)}${button("latest", "Plus tard possible", primary)}</div>`;
+  }
+
+  // Pastille Domicile : la rue, floutée tant que l'adresse est masquée. L'œil, dans l'en-tête à
+  // gauche du choix de la ville, l'affiche ou la masque ; il n'apparaît qu'avec un domicile.
+  const privacyButton = document.getElementById("home-privacy");
+
+  function paintHome() {
+    if (privacyButton) {
+      privacyButton.hidden = !state.home;
+      privacyButton.innerHTML = state.homeHidden ? ICONS.eye : ICONS.eyeOff;
+      privacyButton.setAttribute("aria-label", state.homeHidden ? "Afficher l'adresse de destination" : "Masquer l'adresse de destination");
+      privacyButton.setAttribute("aria-pressed", String(!state.homeHidden));
+    }
+    const value = root.querySelector("#home-value");
+    if (!value || !state.home) return;
+    // La rue reste en place : seul le flou change, et se dissipe en fondu. Floutée, elle est
+    // annoncée « adresse masquée » aux lecteurs d'écran.
+    let street = value.querySelector(".home-street");
+    if (!street) {
+      value.innerHTML = `<span class="home-street">${esc(state.home.label.split(",")[0])}</span><span class="visually-hidden home-masked">adresse masquée</span>`;
+      street = value.querySelector(".home-street");
+    }
+    street.classList.toggle("is-blurred", state.homeHidden);
+    street.toggleAttribute("aria-hidden", state.homeHidden);
+    value.querySelector(".home-masked").hidden = !state.homeHidden;
+  }
 
   // Valeur de la colonne Position, d'après la position partagée et son adresse.
   function positionValue() {
@@ -515,10 +683,15 @@ export function mount({ root, network, adapter }) {
     setAmbient(tone, { pulsing });
   }
 
-  function heroCountdown(option) {
+  // Tuile du compte à rebours, pensée pour un téléphone tenu d'une main : le choix du tracé (s'il y
+  // en a deux) ; l'heure (compteur, heure limite, source), posée sur la tuile ; le trajet, qui ouvre
+  // son détail, avec sa carte carrée ; en bas, sous le pouce, l'itinéraire à pied et Actualiser.
+  function heroCountdown(option, modes = "") {
     const last = option.last;
+    const from = option.origin.station;
     return `
-      <section class="hero glass tone-ok" id="hero">
+      <section class="hero glass tone-ok is-glance" id="hero">
+        ${modes}
         <div class="hero-head">
           <p class="hero-label" id="hero-label">Partez dans</p>
           <p class="countdown" id="countdown"></p>
@@ -529,8 +702,16 @@ export function mount({ root, network, adapter }) {
               : `<p class="hero-source">Estimé sur l'horaire prévu</p>`
           }
         </div>
-        <div class="hero-route">
-          ${routeHtml(option)}
+        <div class="trip-card">
+          <p class="trip-summary">${summaryHtml(option)}</p>
+          <div class="trip-card-map">
+            <div class="route-map-slot"></div>
+            <span class="trip-card-expand" aria-hidden="true">${ICONS.expand}</span>
+          </div>
+          <button type="button" class="trip-card-open" data-action="open-detail" aria-haspopup="dialog" aria-label="Voir le détail du trajet et la carte"></button>
+        </div>
+        <div class="hero-actions">
+          <a class="hero-go" href="${walkLink(location.here, from)}" target="_blank" rel="noopener" aria-label="Itinéraire à pied jusqu'à ${esc(from.name)} (Google Maps)">${ICONS.go}<span>Itinéraire à pied</span></a>
         </div>
         ${PROGRESS}
       </section>`;
@@ -575,7 +756,7 @@ export function mount({ root, network, adapter }) {
     const late = left < -60000;
     const minutes = Math.max(0, Math.floor(left / 60000));
     const html = late
-      ? `<span class="countdown-word">trop tard</span>`
+      ? `<span class="countdown-word">${esc(seasonText("late", "trop tard"))}</span>`
       : left > liveMs
         ? `<span class="countdown-word">plus d'1 h</span>`
         : countdownHtml(minutes);
@@ -608,36 +789,37 @@ export function mount({ root, network, adapter }) {
     // Ce qui manque pour calculer : d'abord le domicile, puis la position.
     const needs = !state.home ? "home" : needPosition ? "position" : null;
     const calloutText = {
-      home: "Indiquez votre domicile pour savoir quand partir.",
+      home: "Indiquez votre destination pour savoir quand partir.",
       position: "Indiquez où vous êtes pour savoir quand partir.",
     };
-    const home = state.home
-      ? esc(state.home.label.split(",")[0])
-      : "Non renseigné";
-    // Deux colonnes côte à côte, d'où vous partez et où vous rentrez. L'annotation, au-dessus de la bande,
-    // pointe vers la colonne qui manque (--col : 0 position, 1 domicile).
+    const home = state.home ? "" : "Non renseignée"; // la rue, floutée ou non : paintHome
+    // Deux pastilles côte à côte, en haut de l'écran : d'où vous partez et où vous rentrez. On les
+    // touche rarement, elles laissent le bas de l'écran au trajet. L'annotation, sous la bande,
+    // pointe vers la pastille qui manque (--col : 0 position, 1 domicile).
     const callout = needs
       ? `<p class="trip-callout" id="callout" style="--col: ${needs === "position" ? 0 : 1}">${calloutText[needs]}</p>`
       : "";
-    // Deux lignes par colonne : l'intitulé et la valeur. Le reste (marche, descente) est dans l'itinéraire.
+    // Par pastille : le pictogramme, puis l'intitulé au-dessus de la valeur.
     const col = (what, action, icon, label, value, id = "") => `
       <li class="trip-col trip-${what}${needs === what ? " is-missing" : ""}">
         <button type="button" class="trip-button" data-action="${action}" aria-haspopup="dialog"${
           needs === what ? ' aria-describedby="callout"' : ""
         }>
           <span class="trip-icon">${icon}</span>
-          <span class="trip-label">${label}</span>
-          <span class="trip-value"${id ? ` id="${id}"` : ""}>${value}</span>
+          <span class="trip-text">
+            <span class="trip-label">${label}</span>
+            <span class="trip-value"${id ? ` id="${id}"` : ""}>${value}</span>
+          </span>
         </button>
       </li>`;
     root.innerHTML = `
       <div class="screen${state.entered ? "" : " is-entering"}">
-        ${hero}
-        ${callout}
         <ol class="trip" aria-label="Votre trajet">
           ${col("position", "open-position", ICONS.here, "Position", "", "position-value")}
-          ${col("home", "open-home", ICONS.home, "Domicile", home)}
+          ${col("home", "open-home", ICONS.home, "Destination", home, "home-value")}
         </ol>
+        ${callout}
+        ${hero}
         ${partial ? `<p class="warning">Certaines lignes n'ont pas répondu : le résultat peut être incomplet.</p>` : ""}
         ${
           meta
@@ -649,27 +831,38 @@ export function mount({ root, network, adapter }) {
     const tone = root.querySelector(".hero")?.className.match(/tone-(\w+)/)?.[1] ?? "none";
     setAmbient(tone);
     state.entered = true;
-    // Actualiser : en haut à droite de la tuile, pictogramme seul. La flèche tourne tant que le
-    // calcul demandé est en cours (classe is-computing sur <body>, js/core/computing.js).
+    // Actualiser : en bas à droite de la tuile, pictogramme seul, sur la ligne de l'itinéraire à
+    // pied quand il y en a une. La flèche tourne tant que le calcul demandé est en cours (classe
+    // is-computing sur <body>, js/core/computing.js).
     if (meta) {
-      root
-        .querySelector(".hero")
-        ?.insertAdjacentHTML(
-          "afterbegin",
-          `<button type="button" class="hero-refresh" data-action="refresh" aria-label="Actualiser les horaires">${ICONS.refresh}</button>`,
-        );
+      const refresh = `<button type="button" class="hero-refresh" data-action="refresh" aria-label="Actualiser les horaires">${ICONS.refresh}</button>`;
+      const actions = root.querySelector(".hero-actions");
+      if (actions) actions.insertAdjacentHTML("beforeend", refresh);
+      else root.querySelector(".hero")?.insertAdjacentHTML("beforeend", refresh);
     }
     paintPosition();
+    paintHome();
     paintCountdown();
   }
 
   function renderLast() {
     const { result, now, partial } = state.last;
-    const option = result.primary ?? null;
-    if (option && !isEnded(option, now)) {
-      return renderScreen({ hero: heroCountdown(option), now, partial, leaveBy: option.leaveBy });
+    const primary = result.primary ?? null;
+    if (primary && !isEnded(primary, now)) {
+      const option = chosen(result);
+      renderScreen({ hero: heroCountdown(option, modesHtml(result)), now, partial, leaveBy: option.leaveBy });
+      return placeMap(option);
     }
-    renderScreen({ hero: endHero(result.status, option), now, partial });
+    renderScreen({ hero: endHero(result.status, primary), now, partial });
+  }
+
+  // Le même aperçu d'un rendu à l'autre : son élément prend la place réservée dans la tuile.
+  function placeMap(option) {
+    const slot = root.querySelector(".route-map-slot");
+    if (!slot || !location.here) return;
+    state.routeMap ??= createRouteMap({ lineColor: mapLineColor, icons: ICONS, loadShapes: adapter.loadShapes });
+    slot.replaceWith(state.routeMap.el);
+    state.routeMap.update({ here: location.here, home: state.home, option });
   }
 
   // Pas de compte à rebours : service terminé, dernier tram manqué ou parti, aucun trajet.
@@ -678,8 +871,8 @@ export function mount({ root, network, adapter }) {
     if (option) {
       return heroText(
         "Service terminé",
-        `Plus de ${V} ce soir`,
-        `Premier ${V} ${badges([option.next.lineCode])} vers chez vous à ${clock(option.next.dep)}.`,
+        seasonText("over", `Plus de ${V} ce soir`, { vehicle: V }),
+        `Premier ${V} ${badges([option.next.lineCode])} vers votre destination à ${clock(option.next.dep)}.`,
         "",
         "late",
       );
@@ -688,7 +881,7 @@ export function mount({ root, network, adapter }) {
       return heroText(
         `Dernier ${V} manqué`,
         "Trop tard à pied",
-        `Le dernier ${V} vers chez vous part avant que vous puissiez rejoindre l'arrêt.${esc(night)}`,
+        `Le dernier ${V} vers votre destination part avant que vous puissiez rejoindre l'arrêt.${esc(night)}`,
         "",
         "late",
       );
@@ -696,8 +889,8 @@ export function mount({ root, network, adapter }) {
     if (status === "over") {
       return heroText(
         "Service terminé",
-        `Plus de ${V} ce soir`,
-        `Le dernier ${V} vers chez vous est parti.${esc(night)}`,
+        seasonText("over", `Plus de ${V} ce soir`, { vehicle: V }),
+        `Le dernier ${V} vers votre destination est parti.${esc(night)}`,
         "",
         "late",
       );
@@ -705,7 +898,7 @@ export function mount({ root, network, adapter }) {
     return heroText(
       `Aucun ${V}`,
       `Plus de ${V} d'ici`,
-      `Aucun ${V} ne relie les arrêts proches de vous à chez vous d'ici la fin du service, même avec correspondance.${esc(night)}`,
+      `Aucun ${V} ne relie les arrêts proches de vous à votre destination d'ici la fin du service, même avec correspondance.${esc(night)}`,
     );
   }
 
@@ -720,7 +913,7 @@ export function mount({ root, network, adapter }) {
 
   function renderAtHome() {
     renderScreen({
-      hero: heroText("Vous y êtes", "À deux pas de chez vous"),
+      hero: heroText("Vous y êtes", "À deux pas de votre destination"),
     });
   }
 
@@ -738,51 +931,42 @@ export function mount({ root, network, adapter }) {
 
   // ---------- Feuilles de réglage ----------
 
-  // L'arrêt de départ n'est pas au choix : c'est celui du tracé qui laisse partir le plus tard.
-  // La feuille montre comment s'y rendre et permet de corriger la position.
-  function openStationSheet() {
-    if (state.home && !location.here) return openPositionSheet();
-    const current = state.last?.result.primary ?? null;
-
+  // Le détail du tracé affiché : la carte, qu'on déplace au doigt (rien ne défile autour d'elle),
+  // avec « Recentrer », puis les étapes heure par heure, qui défilent sous la carte.
+  function openDetailSheet() {
+    const option = chosen(state.last?.result);
+    if (!option || !location.here) return;
+    const map = createRouteMap({ lineColor: mapLineColor, icons: ICONS, interactive: true, loadShapes: adapter.loadShapes });
     const body = openSheet(
-      "Arrêt de départ",
-      `${
-        current
-          ? sheetCurrent(
-              `Le dernier ${V} possible part de`,
-              `${current.origin.station.name}, ${current.origin.walk.minutes} min à pied`,
-            )
-          : sheetNote(
-              !state.home
-                ? "Indiquez d'abord votre domicile : l'arrêt dépend de l'endroit où vous rentrez."
-                : state.last
-                  ? `Aucun arrêt proche n'a de ${V} vers chez vous, même avec correspondance.`
-                  : "Recherche des arrêts autour de vous…",
-            )
-      }
-      ${sheetActions(
-        current && location.here
-          ? sheetAction({
-              icon: "go",
-              label: `Itinéraire à pied jusqu'à ${current.origin.station.name}`,
-              href: walkLink(location.here, current.origin.station),
-            })
-          : "",
-        sheetAction({ icon: "pin", label: "Je ne suis pas ici", action: "manual-origin" }),
-      )}`,
+      "Votre trajet",
+      `<div class="detail">
+        <div class="detail-map">
+          <button type="button" class="map-recenter" data-action="recenter">${ICONS.here}<span>Recentrer</span></button>
+        </div>
+        <div class="detail-steps">${routeHtml(option)}</div>
+      </div>`,
+      {
+        onClose() {
+          map.remove();
+          if (state.detailMap === map) state.detailMap = null;
+        },
+      },
     );
+    body.querySelector(".detail-map").prepend(map.el);
+    state.detailMap = map;
+    map.update({ here: location.here, home: state.home, option });
   }
 
   function openHomeSheet() {
-    const dest = state.last?.result.primary?.dest;
+    const dest = chosen(state.last?.result)?.dest;
     const body = openSheet(
-      "Adresse du domicile",
+      "Destination",
       `<div class="sheet-field"></div>
       ${
         state.home
           ? sheetCurrent("Actuellement", state.home.label)
           : sheetNote(
-              `Terminus cherche le ${V} qui vous ramène au plus près de chez vous. Votre adresse reste enregistrée dans ce navigateur uniquement.`,
+              `Terminus cherche le ${V} qui vous amène au plus près de votre destination. Son adresse reste enregistrée dans ce navigateur uniquement.`,
             )
       }
       ${
@@ -798,7 +982,7 @@ export function mount({ root, network, adapter }) {
       }`,
     );
     const field = createAddressField(body.querySelector(".sheet-field"), {
-      label: state.home ? "Nouvelle adresse" : "Votre adresse",
+      label: state.home ? "Nouvelle adresse" : "Adresse de destination",
       placeholder: `Ex. ${area.addressExample}`,
       area,
       types: "StreetAddress",
@@ -816,12 +1000,31 @@ export function mount({ root, network, adapter }) {
 
   // ---------- Actions ----------
 
+  // Le rendu recrée le choix du tracé : il repart de l'ancien choix, puis la pastille glisse vers
+  // le nouveau et les libellés changent de couleur en fondu (rien si le mouvement est réduit, CSS).
+  function slideModes(from, to) {
+    const modes = root.querySelector(".route-modes");
+    if (!modes) return;
+    const buttons = modes.querySelectorAll(".route-mode");
+    const show = (mode) => {
+      modes.style.setProperty("--active", MODES.indexOf(mode));
+      buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.value === mode)));
+    };
+    modes.classList.add("is-still");
+    show(from);
+    void modes.offsetWidth; // l'ancien état est posé avant le passage au nouveau
+    modes.classList.remove("is-still");
+    show(to);
+  }
+
   function onClick(e) {
     const target = e.target.closest("[data-action]");
     const action = target?.dataset.action;
     if (!action) return;
-    if (action === "open-station") {
-      openStationSheet();
+    if (action === "open-detail") {
+      openDetailSheet();
+    } else if (action === "recenter") {
+      state.detailMap?.recenter();
     } else if (action === "open-position") {
       openPositionSheet();
     } else if (action === "open-home") {
@@ -830,8 +1033,21 @@ export function mount({ root, network, adapter }) {
       adapter.clearCache?.();
       if (location.here) compute({ visible: true });
       else start();
-    } else if (action === "manual-origin") {
-      openPositionSheet();
+    } else if (action === "route-mode") {
+      const mode = target.dataset.value;
+      if (mode === state.mode || !MODES.includes(mode) || !state.last?.result) return;
+      const before = state.mode;
+      state.mode = mode;
+      writeJSON(MODE_KEY, mode);
+      renderLast();
+      slideModes(before, mode);
+      // Le nouveau trajet apparaît en fondu ; le rendu remplace le bouton : le focus revient sur le choix fait.
+      root.querySelector("#hero")?.classList.add("is-switched");
+      root.querySelector(`[data-action="route-mode"][data-value="${mode}"]`)?.focus({ preventScroll: true });
+    } else if (action === "toggle-home") {
+      state.homeHidden = !state.homeHidden;
+      writeJSON(HIDE_HOME_KEY, state.homeHidden);
+      paintHome();
     } else if (action === "retry-gps") {
       closeSheet();
       location.reset();
@@ -857,6 +1073,9 @@ export function mount({ root, network, adapter }) {
       document.removeEventListener("visibilitychange", onVisibility);
       setComputing(false);
       setAmbient("none");
+      if (privacyButton) privacyButton.hidden = true; // l'en-tête reste, l'œil s'en va avec l'écran
+      state.routeMap?.remove();
+      state.detailMap?.remove();
     },
   };
 }

@@ -1,0 +1,307 @@
+/* Thème Halloween 2026 (js/themes/index.js, THEMES.md) : la nuit d'Halloween, violet profond et
+   citrouille. Chargé après style.css, seulement pendant sa période.
+   Règle d'or : le thème habille, il ne change pas le sens. Les couleurs du compte à rebours (vert,
+   orange, rouge, noir) restent celles de Terminus ; le fond garde une lueur du ton.
+   Toujours en apparence sombre : Halloween se vit la nuit. */
+
+:root[data-season="halloween-2026"] {
+  color-scheme: dark;
+  --bg: #120b1c;
+  --surface: #1e1430;
+  --ink: #f3ece2; /* blanc os */
+  --muted: #b9a9c9;
+  --rule: #3a2a52;
+  --accent: #ff8a1f; /* citrouille */
+  --accent-ink: #1a0f05;
+  --live: #6fd597;
+  --live-dot: #ff4d52;
+
+  /* Tons du compte à rebours : ceux de l'apparence sombre de Terminus, inchangés. */
+  --tone-ok: #6fd597;
+  --tone-soon: #ff9a3d;
+  --tone-urgent: #ff7b6e;
+  --tone-none: #b9a9c9;
+
+  /* Verre légèrement violacé. */
+  --glass-bg: rgb(190 150 255 / 0.07);
+  --glass-edge: rgb(220 190 255 / 0.15);
+  --glass-sheen: rgb(255 240 255 / 0.1);
+  --glass-shadow: 0 14px 36px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.25);
+  --glass-press: rgb(255 255 255 / 0.08);
+
+  /* Ambiance sans ton : nuit violette, une braise orangée au loin. */
+  --amb-1: #120b1c;
+  --bar: #120b1c;
+  --amb-2: #3b1d5c;
+  --amb-3: #0b0712;
+  --amb-4: #4a240c;
+}
+
+/* Avec un ton : la grande tache prend sa couleur, le reste de la nuit reste violet. */
+:root[data-season="halloween-2026"][data-tone="ok"] {
+  --amb-1: #110d1c;
+  --bar: #110d1c;
+  --amb-2: #14432c;
+  --amb-3: #0a0712;
+  --amb-4: #3b1d5c;
+}
+
+:root[data-season="halloween-2026"][data-tone="soon"] {
+  --amb-1: #160d14;
+  --bar: #160d14;
+  --amb-2: #5a330f;
+  --amb-3: #0c0710;
+  --amb-4: #3b1d5c;
+}
+
+:root[data-season="halloween-2026"][data-tone="urgent"] {
+  --amb-1: #170b14;
+  --bar: #170b14;
+  --amb-2: #5a1f1c;
+  --amb-3: #0c0610;
+  --amb-4: #3b1d5c;
+}
+
+:root[data-season="halloween-2026"][data-tone="late"] {
+  --amb-1: #07040c;
+  --bar: #07040c;
+  --amb-2: #150c22;
+  --amb-3: #000000;
+  --amb-4: #1c1030;
+}
+
+/* Carte : le Plan IGN n'a pas de version sombre, il est inversé comme en apparence sombre. */
+:root[data-season="halloween-2026"] .route-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.9) sepia(0.15) hue-rotate(220deg);
+}
+
+/* ---------- Décor fixe ---------- */
+
+/* Logo : la barre de fin de ligne devient une petite citrouille. */
+:root[data-season="halloween-2026"] .wordmark::before {
+  width: 1em;
+  height: 1em;
+  border: 0;
+  border-radius: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 7c-1-3 0-5 2-6' stroke='%235b7a2a' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3Cellipse cx='16' cy='19' rx='14' ry='11' fill='%23ff8a1f'/%3E%3Cpath d='M16 8c-4 0-6 5-6 11s2 11 6 11 6-5 6-11-2-11-6-11Z' fill='%23ffa24a'/%3E%3Cpath d='M8 16l4 2-4 2ZM24 16l-4 2 4 2ZM10 24q6 4 12 0l-2-1-2 2-2-2-2 2-2-2Z' fill='%23271204'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Toile d'araignée dans le coin de la tuile, discrète, sans gêner un toucher. */
+:root[data-season="halloween-2026"] .hero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-top-left-radius: inherit;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 88 88' fill='none' stroke='%23f3ece2' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M0 0L88 30M0 0L66 66M0 0L30 88'/%3E%3Cpath d='M22 7Q20 14 15 18Q12 22 7 22'/%3E%3Cpath d='M44 15Q40 28 31 31Q24 40 15 44'/%3E%3Cpath d='M66 22Q60 42 47 47Q36 60 22 66'/%3E%3C/svg%3E") top left / contain no-repeat;
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+/* Lueur de bougie derrière l'heure : la lumière vacille, jamais les chiffres. */
+:root[data-season="halloween-2026"] .hero-head {
+  position: relative;
+}
+
+:root[data-season="halloween-2026"] .hero-head::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -1rem -2.5rem;
+  background: radial-gradient(closest-side, rgb(255 138 31 / 0.16), transparent);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-season="halloween-2026"] .hero-head::before {
+    animation: candle 3.4s ease-in-out infinite;
+  }
+}
+
+@keyframes candle {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  18% {
+    opacity: 0.6;
+  }
+  22% {
+    opacity: 0.95;
+    transform: scale(1.03);
+  }
+  47% {
+    opacity: 0.7;
+  }
+  70% {
+    opacity: 1;
+    transform: scale(0.98);
+  }
+}
+
+/* Carte : la position devient une citrouille, le domicile une maison hantée. */
+:root[data-season="halloween-2026"] .map-pin .trip-glyph {
+  visibility: hidden;
+}
+
+:root[data-season="halloween-2026"] .map-pin.is-here {
+  background: #2a1640 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 7c-1-3 0-5 2-6' stroke='%235b7a2a' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3Cellipse cx='16' cy='19' rx='14' ry='11' fill='%23ff8a1f'/%3E%3Cpath d='M8 16l4 2-4 2ZM24 16l-4 2 4 2ZM10 24q6 4 12 0l-2-1-2 2-2-2-2 2-2-2Z' fill='%23271204'/%3E%3C/svg%3E") center / 72% no-repeat;
+}
+
+:root[data-season="halloween-2026"] .map-pin.is-home {
+  background: #2a1640 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 15L16 4l13 12' fill='none' stroke='%23f3ece2' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M7 13v16h18V13L16 5Z' fill='%23f3ece2'/%3E%3Cpath d='M21 6v5l3 3V6Z' fill='%23f3ece2'/%3E%3Crect x='10' y='15' width='4' height='4' fill='%23ff8a1f'/%3E%3Crect x='18' y='15' width='4' height='4' fill='%23271204'/%3E%3Cpath d='M14 29v-6a2 2 0 0 1 4 0v6Z' fill='%23271204'/%3E%3C/svg%3E") center / 66% no-repeat;
+}
+
+/* ---------- Animations (decorations.js) ---------- */
+
+/* Calques des passants, pris dans la page sur toute sa hauteur (et non dans l'écran) : quand on
+   fait défiler, un fantôme suit le contenu. Derrière le contenu (fantômes lointains, vus à travers
+   le verre) ou devant, sous les feuilles. Seuls les fantômes proches se touchent. */
+:root[data-season="halloween-2026"] body {
+  position: relative;
+}
+
+.season-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.season-layer.is-back {
+  z-index: -1; /* au-dessus du fond d'ambiance, qui le précède, sous tout le contenu */
+}
+
+.season-layer.is-front {
+  z-index: 40;
+}
+
+/* Taille, pâleur et flou viennent de la profondeur de chaque fantôme (decorations.js). */
+.season-ghost {
+  position: absolute;
+  left: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.season-ghost svg {
+  width: 100%;
+  height: 100%;
+  animation: ghost-bob 2.6s ease-in-out infinite;
+}
+
+@keyframes ghost-bob {
+  50% {
+    transform: translateY(-0.9rem) rotate(-4deg);
+  }
+}
+
+.season-bat {
+  position: absolute;
+  width: 1.75rem;
+  height: 1rem;
+}
+
+.season-bat svg {
+  width: 100%;
+  height: 100%;
+  animation: bat-flap 0.22s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+
+@keyframes bat-flap {
+  to {
+    transform: scaleY(0.45);
+  }
+}
+
+/* Araignée : descend du coin de la tuile au bout de son fil, puis remonte. */
+.season-spider {
+  position: absolute;
+  width: 1.5rem;
+  margin-left: -0.75rem;
+  transform-origin: top center;
+}
+
+.season-spider::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  width: 1px;
+  height: 100vh;
+  background: rgb(243 236 226 / 0.55);
+}
+
+.season-spider svg {
+  display: block;
+  width: 100%;
+}
+
+/* Brume : une nappe qui dérive lentement au bas de l'écran, derrière le contenu. */
+.season-fog {
+  position: absolute;
+  left: -30%;
+  right: -30%;
+  bottom: -6vh;
+  height: 38vh;
+  background:
+    radial-gradient(40% 60% at 25% 70%, rgb(200 180 230 / 0.16), transparent 70%),
+    radial-gradient(35% 55% at 60% 80%, rgb(200 180 230 / 0.13), transparent 70%),
+    radial-gradient(30% 50% at 85% 65%, rgb(200 180 230 / 0.11), transparent 70%);
+  filter: blur(14px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .season-fog {
+    animation: fog-drift 46s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes fog-drift {
+  to {
+    transform: translateX(12%);
+  }
+}
+
+/* « Joyeux Halloween », le 31 octobre, une seule fois. */
+.season-toast {
+  position: fixed;
+  z-index: 45;
+  top: calc(4.75rem + env(safe-area-inset-top, 0px));
+  left: 50%;
+  translate: -50% 0;
+  padding: 0.625rem 1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .season-toast {
+    animation: toast 4.5s ease both;
+  }
+}
+
+@keyframes toast {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.75rem);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}

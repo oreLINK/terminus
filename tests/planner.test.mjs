@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseJourneys } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
+import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, sameTrip, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
 
 // Ligne A fictive d'ouest en est : Ouest -> Centre -> Pont -> Est, un quai par sens.
 const A = "bordeaux:Line:59:LOC";
@@ -89,6 +89,16 @@ test("dernier tram : le plus tardif dans le bon sens, pas le dernier de la liste
   assert.equal(r.primary.next.journeyId, "j1");
   // Marche jusqu'à l'arrêt, plus la marge.
   assert.equal(r.primary.leaveBy, r.primary.last.dep - r.primary.origin.walk.minutes * 60000 - WALK_MARGIN_MS);
+});
+
+test("carte : chaque tronçon garde les quais parcourus, de la montée à la descente", () => {
+  const r = run([eastbound("j1", min(10))]);
+  const pos = (ref) => STOPS.filter((s) => s.ref === ref).map(({ lat, lon }) => ({ lat, lon }))[0];
+  assert.deepEqual(r.primary.last.legs[0].path, [pos("C0"), pos("P0"), pos("E0")]);
+  // Avec correspondance : un tracé par tronçon, qui se rejoignent à la station de changement.
+  const t = run([southbound("b1", min(10)), eastbound("a1", min(20))], NOW, nord);
+  assert.deepEqual(t.primary.last.legs.map((l) => l.path.length), [2, 3]);
+  assert.equal(t.primary.last.legs[0].run, undefined);
 });
 
 test("une course partielle qui s'arrête avant l'arrivée n'est pas le dernier tram vers Est", () => {
@@ -228,6 +238,75 @@ test("le dernier direct manqué, la correspondance prend le relais", () => {
   // Pont est aussi à portée de marche, mais le A partiel depuis Centre laisse partir plus tard.
   assert.equal(r.primary.origin.station.name, "Centre");
   assert.equal(r.primary.transfers, 1);
+});
+
+test("le plus pratique : même tracé que le plus tard quand il ne demande pas d'effort en plus", () => {
+  const r = run([eastbound("j1", min(10)), eastbound("j2", min(30))]);
+  assert.ok(sameTrip(r.comfortable, r.primary));
+  assert.equal(r.comfortable.leaveBy, r.primary.leaveBy);
+});
+
+test("le plus pratique : pas 27 min de marche pour partir 10 min plus tard", () => {
+  // Depuis Centre (1 min à pied) : A à +24. Depuis Pont (27 min à pied) : renfort à +60.
+  const r = run([eastbound("a1", min(20)), fromPont("p1", min(60))]);
+  assert.equal(r.primary.origin.station.name, "Pont");
+  assert.equal(r.primary.last.journeyId, "p1");
+  assert.equal(r.comfortable.origin.station.name, "Centre");
+  assert.equal(r.comfortable.last.journeyId, "a1");
+  assert.equal(r.comfortable.leaveBy, min(24) - r.comfortable.origin.walk.minutes * 60000 - WALK_MARGIN_MS);
+  assert.ok(r.primary.leaveBy > r.comfortable.leaveBy);
+});
+
+test("le plus pratique : une correspondance pour 5 min de plus ne vaut pas le coup", () => {
+  // Direct : A complet, Centre à +24. Plus tard de 5 min : A partiel (Centre +29, Pont +32), renfort à +34.
+  const journeys = [eastbound("full", min(20)), eastbound("partial", min(25), { toEnd: false }), fromPont("p1", min(34))];
+  const r = run(journeys);
+  assert.equal(r.primary.transfers, 1);
+  assert.equal(r.comfortable.transfers, 0);
+  assert.equal(r.comfortable.last.journeyId, "full");
+  // Avec 15 min de gagnées, la correspondance l'emporte aussi pour le plus pratique.
+  const later = run([eastbound("full", min(20)), eastbound("partial", min(35), { toEnd: false }), fromPont("p1", min(44))]);
+  assert.equal(later.comfortable.transfers, 1);
+});
+
+test("le prochain : le premier départ atteignable, pas le dernier du service", () => {
+  const r = run([eastbound("j1", min(10)), eastbound("j2", min(30)), eastbound("j3", min(60))]);
+  assert.equal(r.soonest.last.journeyId, "j1");
+  assert.equal(r.primary.last.journeyId, "j3");
+  assert.equal(r.soonest.leaveBy, min(14) - r.soonest.origin.walk.minutes * 60000 - WALK_MARGIN_MS);
+});
+
+test("le prochain : pas 27 min de marche pour arriver 1 min plus tôt", () => {
+  // Depuis Centre (1 min à pied) : A à +24, à Est à +30. Depuis Pont (27 min à pied) : renfort à
+  // +26, à Est à +29.
+  const r = run([eastbound("a1", min(20)), fromPont("p1", min(26))]);
+  assert.equal(r.soonest.origin.station.name, "Centre");
+  assert.equal(r.soonest.last.journeyId, "a1");
+});
+
+test("le prochain : un bus dans plusieurs heures reste le prochain, pas « service terminé »", () => {
+  // 23 h à Paris, fin du service à 3 h : un départ à +150 (1 h 30) est encore ce soir.
+  const origins = nearestStations(index.stations, here, { radius: 2000, min: 2, max: 8 });
+  const dests = nearestStations(index.stations, home, { radius: 1500, min: 1, max: 5 });
+  const args = { origins, dests, journeys: [eastbound("late", min(150))], index, lineCodes: CODES, now: NOW, serviceEnd: serviceEndAfter(NOW, SERVICE) };
+  assert.equal(plan(args).status, "ended");
+  const r = plan({ ...args, serviceGap: Infinity });
+  assert.equal(r.status, "ok");
+  assert.equal(r.soonest.last.journeyId, "late");
+});
+
+test("marche réelle plus longue : le tram prévu est raté, le calcul passe au suivant", () => {
+  // A à +3 (Centre à +7) : rejoignable avec l'estimation (1 min + 2 min de marge), plus avec une
+  // vraie marche de 6 min (détour) : c'est alors le A de +23.
+  const origins = nearestStations(index.stations, here, { radius: 2000, min: 2, max: 8 });
+  const dests = nearestStations(index.stations, home, { radius: 1500, min: 1, max: 5 });
+  const args = { dests, journeys: [eastbound("tot", min(3)), eastbound("suivant", min(23))], index, lineCodes: CODES, now: NOW, serviceEnd: serviceEndAfter(NOW, SERVICE) };
+  const estimated = plan({ ...args, origins });
+  assert.equal(estimated.soonest.last.journeyId, "tot");
+  const real = origins.map((o) => (o.station.name === "Centre" ? { ...o, walk: { ...o.walk, minutes: 6, real: true } } : o));
+  const r = plan({ ...args, origins: real });
+  assert.equal(r.soonest.last.journeyId, "suivant");
+  assert.equal(r.soonest.leaveBy, min(27) - 6 * 60000 - WALK_MARGIN_MS);
 });
 
 test("une correspondance ne se prend jamais après la fin du service (tram du lendemain matin)", () => {

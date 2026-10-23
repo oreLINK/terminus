@@ -1,5 +1,5 @@
 // Réseau TBM, Bordeaux Métropole.
-// Décrit la ville et, pour chaque type d'information qu'il sait fournir, l'adaptateur de données.
+// Décrit la ville et, pour chaque mode qu'il sait fournir, l'adaptateur de données.
 
 import { loadTimetable, clearTimetableCache } from "./siri-lite.js";
 import { isPublicHoliday } from "../../core/holidays.js";
@@ -16,6 +16,9 @@ export default {
   city: "Bordeaux",
   timeZone: "Europe/Paris",
   name: "TBM, Bordeaux Métropole",
+
+  // Mode affiché tant que la personne n'en a pas choisi un autre dans la fenêtre Mode.
+  defaultFeature: "last-ride",
 
   // Zone desservie : sert au choix automatique de la ville d'après la position.
   // Boîte approximative autour de Bordeaux Métropole (non relevée sur un tracé officiel).
@@ -50,7 +53,7 @@ export default {
   // Adresse enregistrée avant les réseaux multiples, reprise une seule fois.
   legacyHomeKey: "dt.home.v1",
 
-  // Types d'information disponibles sur ce réseau, avec leur adaptateur.
+  // Modes disponibles sur ce réseau, avec leur adaptateur.
   features: {
     "last-ride": {
       vehicle: "tram",
@@ -65,6 +68,8 @@ export default {
       loadTimetable, // (lineRef, direction, { until, maxAge }) → [{ id, line, headsign, calls: [...] }]
       // Ordre des arrêts par ligne et par sens, généré par tools/build-graph.mjs, chargé à la demande.
       loadGraph: () => import("./graph.js").then((m) => m.default), // → { names, patterns: [{ line, direction, stops }] }
+      // Tracé réel des lignes (GTFS, tools/build-shapes.mjs), pour la carte ; chargé avec elle.
+      loadShapes: () => import("./shapes.js").then((m) => m.default), // → { lines: { [code]: [encodeLine(…)] } }
       clearCache: clearTimetableCache,
     },
 
@@ -109,6 +114,7 @@ export default {
       loadStops: () => import("./night-stops.js").then((m) => m.default),
       loadTimetable,
       loadGraph: () => import("./night-graph.js").then((m) => m.default),
+      loadShapes: () => import("./shapes.js").then((m) => m.default), // N1 à N8, dans le même fichier
       clearCache: clearTimetableCache,
     },
   },

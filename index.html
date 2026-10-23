@@ -10,9 +10,6 @@
   <meta name="theme-color" content="#F3F5F7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#12202E" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312202E'/%3E%3Crect x='5' y='14' width='17' height='4' fill='%23FFB547'/%3E%3Crect x='21' y='8' width='5' height='16' rx='1' fill='%23FFB547'/%3E%3C/svg%3E">
-  <!-- Polices hébergées avec le site (fonts/) : rien n'est demandé à un service tiers au chargement. -->
-  <link rel="preload" href="fonts/barlow-condensed-700.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="fonts/atkinson-hyperlegible-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/app.js"></script>
 </head>
@@ -23,15 +20,18 @@
   <header class="masthead">
     <p class="wordmark">Terminus</p>
     <nav class="pickers" aria-label="Réglages">
+      <!-- Masquer l'adresse de destination : œil (afficher) ou œil barré (masquer). Affiché et tenu à
+           jour par le mode quand une destination est enregistrée (js/features/last-ride). -->
+      <button type="button" class="picker picker-square" id="home-privacy" data-action="toggle-home" hidden></button>
       <!-- Ville : repère + éclair en mode automatique, repère + nom de la ville en mode manuel (js/app.js). -->
       <button type="button" class="picker" id="picker-city-button" data-action="open-city" aria-haspopup="dialog">
         <svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></svg>
         <span id="picker-city"><span class="visually-hidden">Ville</span></span>
       </button>
-      <!-- Information : un pictogramme seul, le nom reste pour les lecteurs d'écran. -->
+      <!-- Mode : un pictogramme seul, le nom reste pour les lecteurs d'écran. -->
       <button type="button" class="picker picker-square" data-action="open-feature" aria-haspopup="dialog">
         <svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>
-        <span class="visually-hidden" id="picker-feature">Information</span>
+        <span class="visually-hidden" id="picker-feature">Mode</span>
       </button>
     </nav>
   </header>

@@ -1,8 +1,8 @@
-// Registre des types d'information. Ajouter un type : créer son dossier (sur le modèle
+// Registre des modes. Ajouter un mode : créer son dossier (sur le modèle
 // de last-ride/), l'inscrire dans FEATURES, puis déclarer son adaptateur dans chaque
 // réseau qui sait le fournir (network.features[id]).
 //
-// Un type d'information expose :
+// Un mode expose :
 //   id, title (phrase complète), short (libellé du sélecteur), description,
 //   mount({ root, network, adapter }) → { unmount() }
 
@@ -11,7 +11,7 @@ import nightRide from "./night-ride/index.js";
 
 export const FEATURES = [lastRide, nightRide];
 
-// Choix du mode automatique.
+// Mode par défaut d'un réseau qui n'en déclare pas (network.defaultFeature).
 export const DEFAULT_FEATURE = "last-ride";
 
 export const featuresFor = (network) => FEATURES.filter((f) => network.features[f.id]);

@@ -11,6 +11,13 @@ const DRAG_CLOSE_PX = 80;
 
 let dialog = null;
 let closing = null;
+let onClose = null; // nettoyage de la feuille affichée (une carte à retirer, par exemple)
+
+function cleanUp() {
+  const fn = onClose;
+  onClose = null;
+  fn?.();
+}
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -26,6 +33,7 @@ function init() {
     closing = null;
     dialog.classList.remove("is-closing");
     dialog.querySelector(".sheet-panel").style.transform = "";
+    cleanUp();
     document.getElementById("sheet-body").innerHTML = "";
   });
   // Échap : même sortie animée qu'un toucher sur « Fermer ».
@@ -78,9 +86,12 @@ function enableDragToClose(handle) {
   handle.addEventListener("pointercancel", end);
 }
 
-export function openSheet(title, html) {
+// `onClose` : appelé quand la feuille se ferme ou laisse la place à une autre.
+export function openSheet(title, html, { onClose: cleanup = null } = {}) {
   init();
   if (closing) dialog.close();
+  cleanUp();
+  onClose = cleanup;
   const body = document.getElementById("sheet-body");
   document.getElementById("sheet-title").textContent = title;
   body.innerHTML = html;

@@ -12,10 +12,15 @@ export function distanceM(a, b) {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 }
 
+// Minutes de marche pour une distance, arrondies à la minute supérieure, au moins 1.
+export const walkMinutes = (meters) => Math.max(1, Math.ceil(meters / WALK_M_PER_MIN));
+
+// Estimation sans itinéraire : la distance à vol d'oiseau, allongée de 30 % pour les rues.
+// La marche réelle (js/core/walk-route.js) la remplace quand elle est connue.
 export function walkBetween(a, b) {
   const straight = distanceM(a, b);
   const meters = straight * DETOUR_FACTOR;
-  return { straight, meters, minutes: Math.max(1, Math.ceil(meters / WALK_M_PER_MIN)) };
+  return { straight, meters, minutes: walkMinutes(meters) };
 }
 
 const clockFormat = new Intl.DateTimeFormat("fr-FR", {

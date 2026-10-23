@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "graph": "node tools/build-graph.mjs",
+    "shapes": "node tools/build-shapes.mjs",
     "serve": "python3 tools/serve.py 8000"
   }
 }

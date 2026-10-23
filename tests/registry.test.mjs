@@ -19,7 +19,7 @@ const rideAdapters = () =>
     ["last-ride", "night-ride"].filter((id) => n.features[id]).map((id) => ({ n, id, a: n.features[id] })),
   );
 
-test("chaque réseau est complet et ne déclare que des types d'information connus", () => {
+test("chaque réseau est complet et ne déclare que des modes connus", () => {
   const known = new Set(FEATURES.map((f) => f.id));
   const ids = new Set();
   for (const n of NETWORKS) {
@@ -33,10 +33,12 @@ test("chaque réseau est complet et ne déclare que des types d'information conn
     assert.ok(n.area.department && n.area.label && n.area.center, n.id);
     assert.ok(Object.keys(n.features).length > 0, `${n.id} ne fournit aucune information`);
     for (const id of Object.keys(n.features)) assert.ok(known.has(id), `${n.id} : type inconnu ${id}`);
+    // Le mode par défaut de la ville est l'un de ceux qu'elle fournit.
+    if (n.defaultFeature) assert.ok(n.features[n.defaultFeature], `${n.id} : mode par défaut ${n.defaultFeature} absent`);
   }
 });
 
-test("chaque type d'information expose son interface", () => {
+test("chaque mode expose son interface", () => {
   assert.ok(FEATURES.some((f) => f.id === DEFAULT_FEATURE));
   for (const f of FEATURES) {
     assert.ok(f.id && f.title && f.short && f.description, f.id);
