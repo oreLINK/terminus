@@ -39,6 +39,11 @@ Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'u
 | | Arrêts et graphes du tram et de TBNight tirés du GTFS | 🟡 | Aujourd'hui générés depuis SIRI (`npm run graph`) ; rendrait `build-graph.mjs` inutile |
 | | Identifiants courts dans les fichiers générés | 🟡 | Environ 30 à 40 % de moins sur les arrêts et les graphes |
 | | Alerte de données périmées | 🟡 | Échec de l'Action si le GTFS expire bientôt ; signal dans le labo |
+| **Avis** | Avis sur un trajet : Supabase, Edge Function et Turnstile | 🟡 | Un seul appel, à l'envoi ; table fermée au public (RLS), insertion par une Edge Function qui vérifie le jeton Turnstile et limite par IP hachée, clé `service_role` dans les secrets de la fonction ; script Turnstile chargé à l'ouverture de la feuille d'avis seulement |
+| | Rapport d'analyse anonyme, sur consentement | 🟡 | Case décochée par défaut, contenu montré avant l'envoi ; jamais d'adresse, de coordonnées ni d'identifiant |
+| **État du service** | Page d'état par ville : sources disponibles, dégradées ou indisponibles | 🟡 | Sources déclarées par le réseau ; vérifiées côté serveur toutes les 10 min (Edge Function Supabase lancée par `pg_cron`, proposition), la page ne fait qu'un appel en lecture ; historique 24 h |
+| | Vérification depuis le téléphone | 🟡 | Bouton « Tester depuis mon appareil » : un appel léger par source, à la demande seulement (réseau de la personne, CORS) |
+| | Maintien en vie du projet Supabase | 🟡 | Action hebdomadaire : un projet gratuit se met en pause après 7 jours sans activité |
 | **Cartes** | Fond Plan IGN avec Leaflet, chargé à la première carte (Carla) | 🟢 | Leaflet copié dans `vendor/`, aperçu figé dans la tuile, carte interactive dans la feuille |
 | | Tracé réel des lignes (Tom) | 🟢 | Encodé, simplifié, découpé entre la montée et la descente |
 | | Tuiles vectorielles, Leaflet en secours | 🟡 | MapLibre GL JS, style par apparence et par thème |
