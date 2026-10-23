@@ -60,7 +60,8 @@ Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'u
 | | Mode test local (Simon) | 🟢 | Heure simulée, plage horaire, écrans forcés, choix de la méthode ; jamais publié |
 | | Comparateur des deux méthodes (Jules) | 🟢 | `npm run compare -- --mode last-bus` ; écarts classés (fantômes, temps réel…) |
 | | Serveur local sans cache | 🟢 | `npm run serve` |
-| | Tests, déploiement et données par GitHub Actions | 🟢 | `tests.yml`, `deploy.yml`, `data.yml` |
+| | Tests, déploiement et données par GitHub Actions | 🟢 | `tests.yml`, `deploy.yml` (Pages en mode « GitHub Actions », sans branche `gh-pages`), `data.yml` |
+| | Contributions protégées | 🟡 | Fichiers en place : `CODEOWNERS`, `SECURITY.md`, Dependabot, Actions épinglées par empreinte ; réglages GitHub à appliquer (« Réglages GitHub », étapes 1 à 8) |
 
 ## Installation et développement
 
@@ -131,14 +132,18 @@ Relancez `npm run graph` après un changement de desserte (nouvelle ligne, prolo
 |---|---|---|
 | `dev` | développements en cours | commits directs ou branches de travail fusionnées |
 | `main` | code final, publié | **pull request depuis `dev` uniquement** |
-| `gh-pages` | version publiée du site, servie par GitHub Pages | **l'Action de déploiement uniquement**, ne jamais y écrire à la main |
+| `data-refresh` | rechargement hebdomadaire des données | **l'Action « Données du réseau » uniquement**, supprimée après fusion |
+
+Il n'y a pas de branche `gh-pages` : le site publié est un artefact de l'Action de déploiement (GitHub Pages en mode « GitHub Actions »).
 
 Déroulé :
 
 1. Travaillez sur `dev`, ou sur une branche courte créée depuis `dev` (`feat/`, `fix/`, `docs/`, `chore/`) puis fusionnée dans `dev`.
 2. Quand `dev` est prête, ouvrez une pull request `dev` → `main`. Décrivez le contexte, les changements, la validation exécutée et l'impact.
-3. L'Action **Tests** doit passer sur la PR. Fusionnez-la.
+3. L'Action **Tests** doit passer sur la PR, et le propriétaire du dépôt (`.github/CODEOWNERS`) doit l'approuver. Pour ses propres PR, il fusionne grâce à son exception.
 4. Le merge déclenche l'Action **Déploiement GitHub Pages**, qui publie le site.
+
+**Contributions extérieures** : pas d'accès en écriture. *Fork* du dépôt, branche depuis `dev`, puis pull request ; ses tests ne tournent qu'après accord du propriétaire, qui relit et fusionne. Une faille se signale en privé (voir [SECURITY.md](SECURITY.md)), jamais dans une issue.
 
 Si un changement modifie les données échangées (nouveau service appelé, nouvelle clé de stockage, position envoyée ailleurs), mettez à jour `confidentialite.html` dans le même changement.
 
@@ -147,22 +152,32 @@ Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJEC
 ### Actions
 
 - `.github/workflows/tests.yml` (**Tests**) : `npm test` à la demande, à chaque push sur `dev` et sur chaque pull request vers `main`.
-- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `icons/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
-- `.github/workflows/data.yml` (**Données du réseau**) : chaque lundi à 4 h 17 UTC (6 h 17 à Paris l'été, 5 h 17 l'hiver) et à la demande. Crée la branche `data-refresh` depuis `main`, y recharge les arrêts des bus (`npm run bus`), les correspondances à pied (`npm run transfers`), les horaires du soir (`npm run timetable`) et les tracés (`npm run shapes`) depuis le GTFS, lance `npm test`, ouvre une pull request `data-refresh` → `main`, attend que ses vérifications (l'Action « Tests », lancée sur la branche) passent, la fusionne, supprime `data-refresh` et relance la mise en ligne. Une semaine en échec laisse la pull request ouverte ; la suivante la met à jour. Réglage à activer une fois : *Settings → Actions → General → « Allow GitHub Actions to create and approve pull requests »*. Jeton personnel en secret `DATA_PR_TOKEN` facultatif (si la protection de `main` l'exige). Ces fusions arrivent sur `main` sans passer par `dev` : fusionnez `main` dans `dev` (`git merge origin/main`) avant d'ouvrir une pull request `dev` → `main`, en gardant la version de `main` pour les fichiers générés (ou en les régénérant).
+- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `icons/` et `version.json` avec le commit et la date), l'envoie comme artefact (`actions/upload-pages-artifact`), puis le publie (`actions/deploy-pages`) dans l'environnement `github-pages`, qui n'accepte que `main`. Droits : lecture seule pour l'assemblage, `pages: write` et `id-token: write` pour la publication ; aucun droit d'écriture sur le dépôt. L'historique des déploiements est dans *Deployments*. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
+- `.github/dependabot.yml` : chaque lundi, une pull request vers `dev` qui met à jour les Actions des workflows. Elles sont **épinglées par empreinte de commit** (`actions/checkout@<sha> # v7.0.1`), pour qu'un tag déplacé ne puisse pas changer le code exécuté ; Dependabot met à jour l'empreinte et le commentaire.
+- `.github/workflows/data.yml` (**Données du réseau**) : chaque lundi à 4 h 17 UTC (6 h 17 à Paris l'été, 5 h 17 l'hiver) et à la demande. Crée la branche `data-refresh` depuis `main`, y recharge les arrêts des bus (`npm run bus`), les correspondances à pied (`npm run transfers`), les horaires du soir (`npm run timetable`) et les tracés (`npm run shapes`) depuis le GTFS, lance `npm test`, ouvre une pull request `data-refresh` → `main`, attend que ses vérifications (l'Action « Tests ») passent, la fusionne, supprime `data-refresh`, et la fusion lance la mise en ligne. Une semaine en échec laisse la pull request ouverte ; la suivante la met à jour. Jeton requis dès que `main` exige une approbation : secret `DATA_PR_TOKEN` (voir « Réglages GitHub », étape 4) ; l'Action agit alors au nom du propriétaire et fusionne avec son exception (`--admin`), toujours après les vérifications. Sans ce jeton, elle utilise `GITHUB_TOKEN` et a besoin de *« Allow GitHub Actions to create and approve pull requests »*. Ces fusions arrivent sur `main` sans passer par `dev` : fusionnez `main` dans `dev` (`git merge origin/main`) avant d'ouvrir une pull request `dev` → `main`, en gardant la version de `main` pour les fichiers générés (ou en les régénérant).
 
 La version en ligne est consultable à `https://<utilisateur>.github.io/<repo>/version.json`.
 
 ### Réglages GitHub (à faire une fois, dans l'interface)
 
-Ces réglages vivent dans GitHub, pas dans le dépôt : vérifiez-les dans **Settings** avant de les tenir pour acquis.
+Ces réglages vivent dans GitHub, pas dans le dépôt : vérifiez-les dans **Settings** avant de les tenir pour acquis. L'ordre compte : chaque étape s'appuie sur les précédentes.
 
-1. **Protection de `main`** : *Settings > Rules > Rulesets > New branch ruleset*. Cible : `main` (*Include default branch*). Règles : *Restrict deletions*, *Block force pushes*, *Require a pull request before merging*, *Require status checks to pass* avec le contrôle **Tests**. Statut : *Active*.
-2. **Publication** : après le premier déploiement, *Settings > Pages > Build and deployment > Source : Deploy from a branch*, branche `gh-pages`, dossier `/ (root)`.
-3. **Droits de l'Action** : *Settings > Actions > General > Workflow permissions* peut rester sur *Read repository contents* : le workflow de déploiement demande lui-même l'écriture (`permissions: contents: write`).
+1. **Compte du propriétaire** : double authentification par clé d'accès (*passkey*) ou application, pas par SMS ; codes de secours en lieu sûr. Ses droits d'administrateur passent outre les règles : c'est la première protection.
+2. **Fichiers du dépôt sur `main`** : `.github/CODEOWNERS`, `.github/dependabot.yml`, `SECURITY.md` et les workflows épinglés doivent y être fusionnés avant les règles (l'avis du propriétaire s'appuie sur CODEOWNERS, et le contrôle **Tests** doit avoir tourné une fois pour pouvoir être exigé).
+3. **Publication** : *Settings > Pages > Build and deployment > Source : GitHub Actions*, **juste avant** de fusionner le `deploy.yml` qui utilise `actions/deploy-pages` (sinon son premier déploiement échoue : le relancer depuis l'onglet Actions). Puis *Settings > Environments > github-pages > Deployment branches* : `main` seulement. Une fois le site vérifié (`version.json`), supprimer l'ancienne branche `gh-pages`.
+4. **Jeton de l'Action de données** : jeton *fine-grained* du propriétaire (*Settings du compte > Developer settings > Personal access tokens*), limité au dépôt, droits *Contents* et *Pull requests* en lecture et écriture, expiration 90 jours (à noter dans un agenda) ; enregistré dans le secret de dépôt `DATA_PR_TOKEN`. À faire avant les règles de l'étape 6, sans quoi l'Action reste bloquée sur sa pull request.
+5. **Réglages généraux** :
+   - *General > Pull Requests* : fusion *squash* seulement ; *Automatically delete head branches*.
+   - *Actions > General* : *Require approval for all external contributors* (les tests d'un fork attendent l'accord du propriétaire) ; actions autorisées : *Allow actions created by GitHub* seulement ; *Workflow permissions* : *Read repository contents* (chaque workflow demande ce dont il a besoin) ; **décocher** *Allow GitHub Actions to create and approve pull requests* (inutile avec le jeton).
+6. **Règles de branches** (*Settings > Rules > Rulesets > New branch ruleset*, statut *Active*) :
+   - **`main`** (*Include default branch*) : *Restrict deletions*, *Block force pushes*, *Require a pull request before merging* avec 1 approbation, *Dismiss stale approvals*, *Require review from Code Owners*, *Require conversation resolution* ; *Require status checks to pass* avec **Tests** et *Require branches to be up to date* ; *Require linear history*. *Bypass list* : *Repository admin*, en mode **For pull requests only** (le propriétaire fusionne ses PR sans approbation, mais ne pousse jamais directement sur `main`).
+   - **`dev`** : *Restrict deletions*, *Block force pushes*.
+7. **Sécurité** (*Settings > Advanced Security*) : *Secret scanning* et *Push protection*, *Private vulnerability reporting* (le circuit décrit dans `SECURITY.md`), *Dependabot alerts*.
+8. **Vérifier** : une poussée directe sur `main` est refusée ; une PR `dev` → `main` attend **Tests** puis se fusionne par l'exception ; l'Action « Données du réseau » lancée à la main ouvre sa PR, attend les tests, fusionne et déclenche la mise en ligne ; la première PR de Dependabot passe par les mêmes contrôles.
 
 ## Déploiement GitHub Pages
 
-Le site est servi depuis la branche `gh-pages`, alimentée par l'Action de déploiement à chaque merge dans `main` (voir ci-dessus). `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `css/`, `js/`, `vendor/` et `icons/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
+Le site est publié par l'Action de déploiement à chaque merge dans `main`, en mode GitHub Pages « GitHub Actions » (voir ci-dessus) ; il n'y a pas de branche `gh-pages`. `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `css/`, `js/`, `vendor/` et `icons/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
 
 GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossier doit être servi (images, manifeste…), ajoutez-le à l'étape « Assembler le site » de `deploy.yml`.
 
@@ -219,6 +234,9 @@ js/features/last-ride/               « Le dernier tram » : écrans et calcul p
 js/features/last-bus/                « Le dernier bus » (bus de jour), même écran
 js/features/last-transport/          « Le dernier transport » (tram et bus combinés), même écran
 js/features/night-ride/              « Le prochain bus de nuit » (TBNight), même écran
+.github/CODEOWNERS                   propriétaire du dépôt, dont l'avis est exigé sur les PR vers main
+.github/dependabot.yml               mises à jour hebdomadaires des Actions (PR vers dev)
+SECURITY.md                          signalement privé des failles
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
 tests/registry.test.mjs              tests des registres et du stockage de la destination
 tests/compose.test.mjs               tests de l'assemblage des données de plusieurs modes
