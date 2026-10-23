@@ -8,9 +8,9 @@ Terminus vous dit quand quitter l'endroit où vous êtes pour attraper le tram o
 
 Un mode, c'est ce que Terminus calcule pour vous. Il en propose quatre, selon le véhicule qui vous amène à destination :
 
-- **Le dernier tram** (par défaut à Bordeaux) : le dernier tram des lignes A à F qui vous amène encore à destination, tous les soirs. Le compte à rebours fonctionne de 18 h à 3 h du matin.
+- **Le dernier tram** : le dernier tram des lignes A à F qui vous amène encore à destination, tous les soirs. Le compte à rebours fonctionne de 18 h à 3 h du matin.
 - **Le dernier bus** : le dernier bus de jour qui vous amène encore à destination, sur les 62 lignes qui roulent encore le soir (hors lignes scolaires), avec ses correspondances, y compris à pied entre deux arrêts proches. Le compte à rebours fonctionne de 18 h à 3 h du matin.
-- **Le dernier transport** : le dernier trajet possible en combinant tram et bus de jour, l'un après l'autre s'il le faut, avec les correspondances de l'un à l'autre, dans une même station (Victoire, Quinconces…) ou à pied entre deux arrêts proches. Le compte à rebours fonctionne de 18 h à 3 h du matin. Pour celles et ceux dont la destination est desservie par le bus et le tram.
+- **Le dernier transport** (par défaut à Bordeaux) : le dernier trajet possible en combinant tram et bus de jour, l'un après l'autre s'il le faut, avec les correspondances de l'un à l'autre, dans une même station (Victoire, Quinconces…) ou à pied entre deux arrêts proches. Le compte à rebours fonctionne de 18 h à 3 h du matin. Pour celles et ceux dont la destination est desservie par le bus et le tram. Les bus de nuit TBNight n'y sont pas : ils ont leur mode, « Le prochain bus de nuit ».
 - **Le prochain bus de nuit** : le prochain bus TBNight que vous pouvez attraper, et non le dernier de la nuit. Les nuits du jeudi, du vendredi, du samedi et les veilles de jours fériés, de 18 h jusqu'à la fin du service, vers 5 h 15.
 
 Les modes ont le même écran. Seul « Le dernier transport » combine tram et bus ; les autres modes sont calculés séparément, et aucun ne combine les bus de nuit avec le tram ou le bus de jour.
@@ -21,7 +21,7 @@ En haut à droite, trois petits boutons :
 
 - **L'œil** : affiche ou floute l'adresse de votre destination.
 - **La ville** (repère) : en automatique, signalé par un éclair, Terminus la choisit d'après votre position. Vous pouvez aussi la fixer.
-- **Le mode** (grille) : « Le dernier tram » (par défaut à Bordeaux), « Le dernier bus », « Le dernier transport » ou « Le prochain bus de nuit ». Votre choix est mémorisé.
+- **Le mode** (grille) : « Le dernier tram », « Le dernier bus », « Le dernier transport » (par défaut à Bordeaux) ou « Le prochain bus de nuit ». Votre choix est mémorisé.
 
 Ensuite :
 
@@ -79,10 +79,10 @@ Seule Bordeaux Métropole est couverte pour le moment. Chaque nouvelle ville aur
 
 | | | État | Précisions |
 |---|---|:---:|---|
-| **Modes** | Le dernier tram | 🟢 | Par défaut. Lignes A à F, tous les soirs, de 18 h à 3 h |
+| **Modes** | Le dernier tram | 🟢 | Lignes A à F, tous les soirs, de 18 h à 3 h |
 | | Le prochain bus de nuit | 🟢 | Lignes N1 à N8, jeudi, vendredi, samedi et veilles de fêtes, de 18 h à 5 h 15 |
 | | Le dernier bus | 🟢 | 62 lignes de bus de jour qui roulent le soir, de 18 h à 3 h |
-| | Le dernier transport | 🟢 | Tram et bus de jour combinés, de 18 h à 3 h |
+| | Le dernier transport | 🟢 | Par défaut. Tram et bus de jour combinés, sans les bus de nuit, de 18 h à 3 h |
 | **Thèmes** | Terminus | 🟢 | Par défaut, hors des périodes de saison |
 | | Halloween 2026 | 🟢 | Du 15 octobre 2026 à 18 h au 1er novembre 2026 à 8 h |
 | **Transports** | Tram | 🟢 | Lignes A à F |
