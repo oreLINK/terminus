@@ -33,10 +33,25 @@ Sur un site ouvert, le thème change à l'heure dite : la page revérifie le cal
 1. Créez un dossier `js/themes/<identifiant>/`, sur le modèle de `halloween-2026/` :
    - `theme.css` : les couleurs (jetons de `style.css` redéfinis sous `:root[data-season="<identifiant>"]`) et le décor fixe. Gardez les couleurs du compte à rebours (`--tone-ok`, `--tone-soon`, `--tone-urgent`) et ajoutez `--bar` (couleur de la barre du navigateur) avec chaque `--amb-1`.
    - `decorations.js` (facultatif) : les animations, un module qui exporte `start({ theme, now })` et renvoie une fonction qui les arrête. Respectez `prefers-reduced-motion`, arrêtez tout quand la page est cachée et rien sous 10 minutes (`data-tone` à `urgent` ou `late`).
-2. Inscrivez-le dans `THEMES` (`js/themes/index.js`) : `id`, `name`, `from`, `to`, `timeZone`, `stylesheet`, `decorations`, et `texts` pour remplacer des textes (clés `late` : « trop tard », `over` : « Plus de {vehicle} ce soir »).
+2. Inscrivez-le dans `THEMES` (`js/themes/index.js`) : `id`, `name`, `from`, `to`, `timeZone`, `stylesheet`, `decorations`, `texts` pour remplacer des textes (clés `late` : « trop tard », `over` : « Plus de {vehicle} ce soir »), et `logo` (voir ci-dessous).
 3. Ajoutez sa ligne au calendrier ci-dessus, puis `npm test`.
 
 Deux périodes ne doivent pas se chevaucher : si c'est le cas, le premier thème de la liste l'emporte.
+
+## Logo
+
+Chaque thème a son logo, désigné par un identifiant du catalogue `js/themes/logos.js` (champ `logo`) ; sans logo, celui du thème Terminus. Leur style est dans `css/style.css`, section « Logo ».
+
+| Thème | Logo |
+|---|---|
+| Terminus | T13, « Ticket » : un titre de transport en couleur, le talon prédécoupé portant la fin de ligne |
+| Halloween 2026 | H09, « Girouette hantée » |
+
+Logos gardés en réserve (choix du 23/10/2026), prêts à servir : T06 Pastilles de ligne, T07 Pastille T, T08 Point en direct, T09 Point final, T10 Girouette, T11 Palettes, T12 Plaque de station, H10 Pleine lune, H11 Bougie.
+
+- **Changer le logo d'un thème** : remplacer l'identifiant `logo` dans `js/themes/index.js`.
+- **Changer le logo du thème Terminus** : remplacer `logo` de `DEFAULT_THEME`, puis recopier le résultat de `logoHtml("<identifiant>")` dans `.wordmark` d'`index.html`, `mentions-legales.html` et `confidentialite.html` (affiché sans attendre le script). `npm test` signale un oubli.
+- **Ajouter un logo** : une entrée dans `LOGOS` (`js/themes/logos.js`), dimensionnée en em et colorée par les jetons du thème, et son style dans `css/style.css`.
 
 ## Voir un thème hors de sa période
 
@@ -47,7 +62,8 @@ Sur le poste de développement (`npm run serve`, puis `http://localhost:8000/lab
 Du 15 octobre 2026 à 18 h au 1er novembre 2026 à 8 h. La nuit d'Halloween : violet profond et orange citrouille, toujours en apparence sombre.
 
 - **Couleurs** : fond violet nuit où la teinte de la situation reste visible, accent citrouille, verre violacé, texte blanc os.
-- **Décor fixe** : citrouille à la place de la fin de ligne du logo, toile d'araignée dans le coin de la tuile, lueur de bougie qui vacille derrière l'heure (jamais sur les chiffres), citrouille et maison hantée sur la carte.
+- **Logo** : H09, « Girouette hantée » : l'afficheur d'un tram en points orange, décroché et délabré. Il penche et se balance doucement, pendu à deux câbles qui montent jusqu'au bord de l'écran ; celui de droite, effiloché, crache de temps en temps une gerbe d'étincelles (toutes les 5 à 8 s) et l'affichage baisse au même moment, comme un court-circuit. Points morts, U qui pend de travers, coin cassé, fissure, rouille ; une lettre grésille. Immobile si le téléphone demande de réduire les animations.
+- **Décor fixe** : toile d'araignée dans le coin de la tuile, lueur de bougie qui vacille derrière l'heure (jamais sur les chiffres), citrouille et maison hantée sur la carte.
 - **Animations** : toutes les 45 s à 1 min 30 environ, un groupe de deux à quatre fantômes traverse la page (six au plus à la fois), pour un effet de profondeur : chacun a sa profondeur, au hasard. Lointain, il est petit, lent (22 à 30 s), pâle et un peu flou, et passe derrière la tuile, vu à travers le verre ; proche, il est grand, rapide (9 à 12 s) et net, et passe devant. Leur trajectoire est prise dans la page et non dans l'écran : quand on fait défiler, un fantôme suit le contenu. Aussi : brume qui dérive au bas de l'écran ; trois chauves-souris s'envolent d'« Actualiser » ; une araignée descend de sa toile quand le compte à rebours passe à « maintenant ».
 - **Textes** : « Bouh… trop tard » à la place de « trop tard », « Le dernier tram s'est évaporé » à la place de « Plus de tram ce soir ».
 - **Le 31 octobre** : des groupes plus fréquents (toutes les 20 à 45 s), et « Joyeux Halloween 🎃 » affiché une seule fois.

@@ -44,6 +44,7 @@ Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'u
 | | Tuiles vectorielles, Leaflet en secours | 🟡 | MapLibre GL JS, style par apparence et par thème |
 | | Position des véhicules en temps réel | 🟡 | Flux GTFS-RT des véhicules (55 Ko), décodeur protobuf à écrire |
 | **Habillage** | Thèmes de saison imposés par leurs dates (Coco) | 🟢 | Calendrier dans `js/themes/index.js` et `THEMES.md`, vérifiés par un test |
+| | Logo par thème, catalogue de logos (Coco) | 🟢 | `logo` du thème dans `js/themes/index.js` ; 11 logos dans `js/themes/logos.js` (T13 et H09 en service, 9 en réserve), voir `THEMES.md` |
 | | Apparence claire ou sombre, jetons de design | 🟢 | Jetons dans `:root`, couleur de la barre du navigateur lue dans le CSS |
 | **Architecture** | Plusieurs réseaux et plusieurs modes | 🟢 | Un objet réseau avec un adaptateur par mode, registres testés |
 | | Briques communes sans dépendance à une fonctionnalité | 🟢 | Dates, noms, stations, pictogrammes dans `js/core/` |
