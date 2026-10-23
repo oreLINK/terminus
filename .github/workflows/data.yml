@@ -7,12 +7,14 @@
 # Les arrêts et le graphe du tram et de TBNight (npm run graph) restent manuels : ils dépendent du flux
 # SIRI, en journée et hors travaux.
 #
-# Réglage à activer une fois : Settings > Actions > General > « Allow GitHub Actions to create and
-# approve pull requests ».
-# Une Action qui pousse avec GITHUB_TOKEN ne déclenche pas les autres : celle-ci lance donc « Tests » à
-# la main sur data-refresh (son résultat s'affiche sur la pull request), puis relance la mise en ligne
-# après la fusion. Avec un jeton personnel en secret DATA_PR_TOKEN (utile si la règle de protection de
-# main l'exige), la pull request lance « Tests » et la fusion lance la mise en ligne d'elles-mêmes.
+# Jeton : secret DATA_PR_TOKEN, jeton personnel « fine-grained » de l'administrateur, limité à ce dépôt
+# (Contents et Pull requests en écriture). Indispensable dès que la règle de main exige une
+# approbation : l'Action agit au nom de l'administrateur et fusionne avec son exception (--admin),
+# toujours après le passage des vérifications. La pull request lance alors « Tests » et la fusion lance
+# la mise en ligne d'elles-mêmes.
+# Sans ce jeton (avant la mise en place des règles) : il faut « Allow GitHub Actions to create and
+# approve pull requests » (Settings > Actions > General) ; une Action qui pousse avec GITHUB_TOKEN ne
+# déclenche pas les autres, celle-ci lance donc « Tests » sur data-refresh puis la mise en ligne.
 name: Données du réseau
 
 on:
@@ -39,12 +41,12 @@ jobs:
       GH_TOKEN: ${{ secrets.DATA_PR_TOKEN || github.token }}
       WITH_PAT: ${{ secrets.DATA_PR_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           token: ${{ secrets.DATA_PR_TOKEN || github.token }}
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           package-manager-cache: false # aucune dépendance npm, rien à mettre en cache
@@ -121,6 +123,9 @@ jobs:
       - name: Fusion dans main et suppression de data-refresh
         if: steps.pr.outputs.url != ''
         run: |
-          gh pr merge "${{ steps.pr.outputs.url }}" --squash --delete-branch
+          # Avec le jeton de l'administrateur, son exception couvre l'approbation exigée par la règle de
+          # main ; les vérifications, elles, viennent de passer (étape précédente, sinon on s'arrête).
+          if [ "$WITH_PAT" = "true" ]; then admin="--admin"; else admin=""; fi
+          gh pr merge "${{ steps.pr.outputs.url }}" --squash --delete-branch $admin
           # Une fusion faite par GITHUB_TOKEN ne déclenche pas la mise en ligne : on la relance.
           if [ "$WITH_PAT" != "true" ]; then gh workflow run deploy.yml --ref main; fi

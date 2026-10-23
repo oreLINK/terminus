@@ -1,6 +1,8 @@
-# À chaque merge dans main : tests, assemblage du site, puis publication dans la branche gh-pages,
-# que GitHub Pages sert (Settings > Pages > Deploy from a branch > gh-pages, / (root)).
+# À chaque merge dans main : tests, assemblage du site, puis déploiement par GitHub Pages en mode
+# « GitHub Actions » (Settings > Pages > Source : GitHub Actions). Pas de branche gh-pages : le site
+# publié est un artefact de ce workflow, et l'environnement github-pages n'accepte que main.
 # Pas d'étape de compilation : le site est statique. « Assembler » = ne garder que les fichiers servis.
+# Actions épinglées par empreinte de commit (version en commentaire) ; Dependabot les met à jour.
 name: Déploiement GitHub Pages
 
 on:
@@ -9,20 +11,21 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # pousser sur gh-pages
+  contents: read
 
 # Un seul déploiement à la fois, dans l'ordre des merges.
 concurrency:
-  group: gh-pages
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
+    name: Assembler
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           package-manager-cache: false # aucune dépendance npm, rien à mettre en cache
@@ -34,28 +37,25 @@ jobs:
         run: |
           mkdir _site
           cp -R index.html mentions-legales.html confidentialite.html css js vendor icons _site/
-          # Pas de traitement Jekyll : les fichiers sont servis tels quels.
-          touch _site/.nojekyll
           # Version publiée, consultable à /version.json.
           printf '{"commit":"%s","date":"%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > _site/version.json
 
-      - name: Publier dans gh-pages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          repo="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          # La branche gh-pages est créée au premier déploiement, puis garde l'historique des versions.
-          if git ls-remote --exit-code --heads "$repo" gh-pages > /dev/null; then
-            git clone --quiet --depth 1 --branch gh-pages "$repo" pub
-          else
-            git init --quiet --initial-branch gh-pages pub
-            git -C pub remote add origin "$repo"
-          fi
-          find pub -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -R _site/. pub/
-          cd pub
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add --all
-          git commit --quiet -m "Déploiement de ${GITHUB_SHA::7}"
-          git push --quiet origin gh-pages
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    name: Publier
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write # publier sur GitHub Pages
+      id-token: write # prouver à Pages que le déploiement vient de ce workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

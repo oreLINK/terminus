@@ -1,0 +1,19 @@
+# Mises à jour des Actions GitHub utilisées par les workflows, épinglées par empreinte de commit :
+# Dependabot propose chaque semaine une seule pull request vers dev (le chemin normal vers main passe
+# par dev), qui passe par les mêmes vérifications que le reste. Pas de dépendance npm à suivre.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Paris
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(actions)"
+    labels: []
