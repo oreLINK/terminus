@@ -10,29 +10,12 @@
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import nightStops from "../js/networks/bordeaux-tbm/night-stops.js";
-import { withGtfs } from "./gtfs.mjs";
+import { withGtfs, todayIn, lineRef, stopRef, routeOf, stopOf, secs, nextDates, activeServices, isContained } from "./gtfs.mjs";
 
 const DIR = new URL("../js/networks/bordeaux-tbm/", import.meta.url);
-const TIME_ZONE = "Europe/Paris";
 const DAYS = 21;
 const SINCE_S = 18 * 3600;
-const lineRef = (route) => `bordeaux:Line:${route}:LOC`;
-const stopRef = (stop) => `bordeaux:StopPoint:BP:${stop}:LOC`;
-const routeOf = (ref) => /^bordeaux:Line:(.+):LOC$/.exec(ref)?.[1];
 const night = new Set(Object.keys(nightStops.lines).map(routeOf));
-const secs = (hms) => {
-  const [h, m, s] = hms.split(":").map(Number);
-  return h * 3600 + m * 60 + s;
-};
-const compact = (d) => d.replaceAll("-", "");
-const weekday = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-
-// `inner` apparaît d'un seul tenant dans `outer` : course partielle.
-function isContained(inner, outer) {
-  if (inner.length >= outer.length) return false;
-  const start = outer.indexOf(inner[0]);
-  return start >= 0 && inner.every((ref, i) => outer[start + i] === ref);
-}
 
 await withGtfs(async ({ read, stream }) => {
   const feed = read("feed_info.txt")[0];
@@ -44,25 +27,10 @@ await withGtfs(async ({ read, stream }) => {
   );
 
   // Services actifs dans les 21 prochains jours.
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date());
-  const calendar = read("calendar.txt");
-  const exceptions = read("calendar_dates.txt");
-  const active = new Set();
-  for (let i = 0; i < DAYS; i++) {
-    const d = new Date(`${today}T12:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + i);
-    const date = d.toISOString().slice(0, 10);
-    const c = compact(date);
-    if (c > feed.feed_end_date) break;
-    const day = weekday[d.getUTCDay()];
-    const on = new Set(calendar.filter((s) => s.start_date <= c && c <= s.end_date && s[day] === "1").map((s) => s.service_id));
-    for (const e of exceptions) {
-      if (e.date !== c) continue;
-      if (e.exception_type === "1") on.add(e.service_id);
-      else on.delete(e.service_id);
-    }
-    on.forEach((s) => active.add(s));
-  }
+  const dates = nextDates(DAYS, feed.feed_end_date);
+  const today = todayIn();
+  const activeOn = activeServices(read);
+  const active = new Set(dates.flatMap((date) => [...activeOn(date)]));
 
   const trips = new Map();
   for (const t of read("trips.txt")) {
@@ -98,7 +66,7 @@ await withGtfs(async ({ read, stream }) => {
   for (const p of patterns) for (const ref of p.stops) linesOf.set(ref, new Set([...(linesOf.get(ref) ?? []), p.line]));
   const stops = [...linesOf]
     .map(([ref, lines]) => {
-      const s = stopsTxt.get(/BP:(.+):LOC$/.exec(ref)[1]);
+      const s = stopsTxt.get(stopOf(ref));
       return { ref, name: s.stop_name, lat: Number(s.stop_lat), lon: Number(s.stop_lon), lines: [...lines].sort() };
     })
     .sort((a, b) => a.ref.localeCompare(b.ref));

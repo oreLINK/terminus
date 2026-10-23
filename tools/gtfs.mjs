@@ -1,6 +1,7 @@
-// GTFS statique de TBM : téléchargement (environ 22 Mo) et lecture des fichiers CSV, partagés par
-// les générateurs (build-shapes.mjs, build-timetable.mjs). La lecture passe par la commande unzip du
-// système ; stop_times.txt (160 Mo) est lu en flux, ligne à ligne.
+// Gus — le GTFS statique de TBM pour les générateurs (build-bus-network, build-shapes,
+// build-timetable) : téléchargement (environ 22 Mo), lecture des fichiers CSV, jours de service actifs
+// et identifiants. La lecture passe par la commande unzip du système ; stop_times.txt (160 Mo) est lu
+// en flux, ligne à ligne.
 
 import { spawn, spawnSync } from "node:child_process";
 import { writeFile, mkdtemp, rm } from "node:fs/promises";
@@ -9,6 +10,63 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export const GTFS_URL = "https://bdx.mecatran.com/utw/ws/gtfsfeed/static/bordeaux?apiKey=opendata-bordeaux-metropole-flux-gtfs-rt";
+export const TIME_ZONE = "Europe/Paris";
+
+// Identifiants GTFS ↔ identifiants SIRI de TBM (ceux des fichiers générés) : route_id « 59 » ↔
+// « bordeaux:Line:59:LOC », stop_id « 3684 » ↔ « bordeaux:StopPoint:BP:3684:LOC ».
+export const lineRef = (route) => `bordeaux:Line:${route}:LOC`;
+export const stopRef = (stop) => `bordeaux:StopPoint:BP:${stop}:LOC`;
+export const routeOf = (ref) => /^bordeaux:Line:(.+):LOC$/.exec(ref)?.[1];
+export const stopOf = (ref) => /^bordeaux:StopPoint:BP:(.+):LOC$/.exec(ref)?.[1];
+
+// « HH:MM:SS » → secondes depuis « midi moins 12 h » (au-delà de 24:00 après minuit).
+export const secs = (hms) => {
+  const [h, m, s] = hms.split(":").map(Number);
+  return h * 3600 + m * 60 + s;
+};
+
+// Jour de la génération, heure de Paris : AAAA-MM-JJ.
+export const todayIn = (timeZone = TIME_ZONE) => new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+
+// Jours de service à générer : du jour de la génération aux `count` suivants, sans dépasser la fin
+// du GTFS (feed_end_date, AAAAMMJJ). Format AAAA-MM-JJ.
+export function nextDates(count, feedEnd, timeZone = TIME_ZONE) {
+  const today = todayIn(timeZone);
+  const dates = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    const date = d.toISOString().slice(0, 10);
+    if (date.replaceAll("-", "") <= feedEnd) dates.push(date);
+  }
+  return dates;
+}
+
+// Services actifs un jour donné (calendar.txt et ses exceptions, calendar_dates.txt) :
+// activeServices(read)(« AAAA-MM-JJ ») → Set de service_id.
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+export function activeServices(read) {
+  const calendar = read("calendar.txt");
+  const exceptions = read("calendar_dates.txt");
+  return (date) => {
+    const c = date.replaceAll("-", "");
+    const day = WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()];
+    const on = new Set(calendar.filter((s) => s.start_date <= c && c <= s.end_date && s[day] === "1").map((s) => s.service_id));
+    for (const e of exceptions) {
+      if (e.date !== c) continue;
+      if (e.exception_type === "1") on.add(e.service_id);
+      else on.delete(e.service_id);
+    }
+    return on;
+  };
+}
+
+// `inner` apparaît d'un seul tenant dans `outer` : course partielle (son motif est retiré).
+export function isContained(inner, outer) {
+  if (inner.length >= outer.length) return false;
+  const start = outer.indexOf(inner[0]);
+  return start >= 0 && inner.every((ref, i) => outer[start + i] === ref);
+}
 
 // Lecture CSV simple, guillemets compris (les noms de lignes peuvent contenir des virgules).
 export function parseCsv(text) {

@@ -1,5 +1,5 @@
-// Assemblage des données de plusieurs modes, pour un mode qui les combine (« Le dernier transport » :
-// tram et bus). Rien n'est généré en double : on assemble au chargement les fichiers de chaque mode.
+// Colette — assemble les données de plusieurs modes, pour un mode qui les combine
+// (« Le dernier transport » : tram et bus). Rien n'est généré en double : on assemble au chargement les fichiers de chaque mode.
 // Fonctions pures, sans rien de propre à un réseau.
 
 // Arrêts : { lines, stops } de chaque mode → un seul jeu. Un quai présent dans plusieurs modes garde

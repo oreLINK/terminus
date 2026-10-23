@@ -1,4 +1,4 @@
-// Itinéraire piéton réel : calcul d'itinéraire de la Géoplateforme de l'IGN (profil « pedestrian »,
+// Max — la marche à pied. Itinéraire piéton réel : calcul d'itinéraire de la Géoplateforme de l'IGN (profil « pedestrian »,
 // France entière, sans clé). Il donne le tracé rue par rue et la vraie distance ; le temps de marche
 // reste celui de Terminus (walkMinutes, 4,7 km/h), l'IGN supposant une marche plus lente.
 // Le service accepte 10 appels par seconde : on n'en lance que deux à la fois, espacés, et un refus

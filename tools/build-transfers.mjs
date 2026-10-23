@@ -15,7 +15,7 @@
 
 import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { buildIndex } from "../js/features/last-ride/planner.js";
+import { buildIndex } from "../js/core/stations.js";
 import { mergeStops } from "../js/core/compose.js";
 import { distanceM, walkBetween } from "../js/core/util.js";
 import { fetchWalk } from "../js/core/walk-route.js";

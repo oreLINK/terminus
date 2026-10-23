@@ -1,4 +1,4 @@
-// Carte du tracé affiché : la marche en pointillé, rue par rue quand l'itinéraire piéton est connu
+// Carla, pour la tuile — carte du tracé affiché : la marche en pointillé, rue par rue quand l'itinéraire piéton est connu
 // (walk.path, js/core/walk-route.js), sinon à vol d'oiseau ; le tram ou le bus de nuit sur le
 // tracé réel de sa ligne (GTFS, shapes.js, découpé par traceAlong), à la couleur de la ligne. Sans
 // tracé qui colle (branche absente du GTFS), le tronçon relie les quais en ligne droite.

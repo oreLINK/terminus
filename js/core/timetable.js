@@ -1,10 +1,11 @@
+// Léa (lit les horaires du soir) et Rémi (y recolle le temps réel, mergeLive).
 // Horaires théoriques du soir, inclus dans le site (générés depuis le GTFS par
 // tools/build-timetable.mjs) : ils donnent les courses au même format que le flux SIRI (voir
 // parseJourneys), pour calculer le trajet sans appeler l'API, puis ne demander le temps réel que pour
 // les lignes du trajet retenu (mergeLive). CONTEXT.md, section 11, piste 10. Fonctions pures, sauf
 // eveningJourneys qui charge les fichiers par l'adaptateur.
 
-import { zonedTime } from "./util.js";
+import { zonedTime } from "./dates.js";
 
 // Courses d'un jour de service. `refs` traduit les identifiants GTFS en identifiants SIRI du réseau :
 // { line(route_id), stop(stop_id), journey(trip_id) }. `lines` : les lignes à garder (Set de refs
@@ -51,7 +52,7 @@ export async function eveningJourneys(source, evening, nextDate, lines = null, n
   return out;
 }
 
-// Applique le temps réel des (ligne, sens) interrogés aux courses théoriques. Le temps réel corrige
+// Rémi — applique le temps réel des (ligne, sens) interrogés aux courses théoriques. Le temps réel corrige
 // ou annule, mais une absence ne prouve rien : le flux SIRI de TBM omet des courses bien réelles
 // (constaté le 23/10/2026 : les courses d'après minuit d'un soir, dont il ne garde que celles de la
 // veille, l'identifiant d'une course de semaine se répétant chaque jour) et en publie de fantômes
@@ -93,7 +94,3 @@ export function mergeLive(journeys, requests, live) {
   }
   return [...out.filter(Boolean), ...added];
 }
-
-// Jours de service au format AAAA-MM-JJ.
-export const isoDate = ({ year, month, day }) =>
-  `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

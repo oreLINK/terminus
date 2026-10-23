@@ -1,103 +1,10 @@
-// Calcul du trajet en tram entre la position actuelle et le domicile, avec ou sans correspondance.
+// Bob — construit l'itinéraire : de la position actuelle à la destination, en tram, en bus ou les
+// deux, avec ou sans correspondance (dans une station ou à pied), le plus tard, le plus pratique ou
+// le prochain. Les stations viennent d'Inès (js/core/stations.js), les courses de Léa et Rémi
+// (js/core/timetable.js) ou de Sam (siri-lite.js), les correspondances à pied de Max.
 // Fonctions pures : aucune dépendance au DOM ni au réseau, testables avec Node.
 
-import { distanceM, walkBetween, walkSeconds } from "../../core/util.js";
-
-export const normName = (s) =>
-  String(s)
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-
-// Regroupe les quais (un point d'arrêt par sens) en stations.
-// Deux arrêts homonymes à plus de 600 m l'un de l'autre restent distincts.
-export function buildIndex(stops) {
-  const byName = new Map();
-  for (const s of stops) {
-    const key = normName(s.name);
-    if (!byName.has(key)) byName.set(key, []);
-    byName.get(key).push(s);
-  }
-
-  const stations = [];
-  for (const [key, points] of byName) {
-    const clusters = [];
-    for (const p of points) {
-      const c = clusters.find((cl) => distanceM(cl, p) < 600);
-      if (c) {
-        c.points.push(p);
-        c.lat = c.points.reduce((sum, q) => sum + q.lat, 0) / c.points.length;
-        c.lon = c.points.reduce((sum, q) => sum + q.lon, 0) / c.points.length;
-      } else {
-        clusters.push({ lat: p.lat, lon: p.lon, points: [p] });
-      }
-    }
-    clusters.forEach((c, i) => {
-      stations.push({
-        id: clusters.length > 1 ? `${key}#${i}` : key,
-        key,
-        name: c.points[0].name,
-        lat: c.lat,
-        lon: c.lon,
-        refs: c.points.map((p) => p.ref),
-        lines: [...new Set(c.points.flatMap((p) => p.lines))],
-      });
-    });
-  }
-
-  const byRef = new Map();
-  const byKey = new Map();
-  const points = new Map(stops.map((s) => [s.ref, { lat: s.lat, lon: s.lon }]));
-  for (const st of stations) {
-    for (const r of st.refs) byRef.set(r, st);
-    if (!byKey.has(st.key)) byKey.set(st.key, []);
-    byKey.get(st.key).push(st);
-  }
-
-  return {
-    stations,
-    stationFor(call) {
-      const hit = byRef.get(call.ref);
-      if (hit) return hit;
-      const sameName = byKey.get(normName(call.name));
-      return sameName && sameName.length === 1 ? sameName[0] : null;
-    },
-    // Position du quai lui-même, plus fidèle au tracé que le centre de la station.
-    pointOf: (ref) => points.get(ref) ?? null,
-  };
-}
-
-// Stations autour d'un point : toutes celles dans le rayon (à vol d'oiseau),
-// au moins `min` même si elles sont plus loin, au plus `max`.
-export function nearestStations(stations, point, { radius, min, max }) {
-  const sorted = stations
-    .map((station) => ({ station, walk: walkBetween(point, station) }))
-    .sort((a, b) => a.walk.straight - b.walk.straight);
-  const inRadius = sorted.filter((x) => x.walk.straight <= radius).slice(0, max);
-  return inRadius.length >= min ? inRadius : sorted.slice(0, min);
-}
-
-// Stations candidates autour d'un point, ligne par ligne : pour chaque ligne, la station la plus
-// proche qui la dessert dans le rayon, plus les `min` stations les plus proches quelle que soit leur
-// ligne ; au plus `max`, les plus proches d'abord. Sans cela, les 8 stations les plus proches seraient
-// toutes sur une même ligne dense (le bus, demain) et masqueraient une autre ligne un peu plus loin.
-export function candidateStations(stations, point, { radius, min, max }) {
-  const sorted = stations
-    .map((station) => ({ station, walk: walkBetween(point, station) }))
-    .sort((a, b) => a.walk.straight - b.walk.straight);
-  const kept = new Set(sorted.slice(0, min));
-  const covered = new Set();
-  for (const x of sorted) {
-    if (x.walk.straight > radius) break;
-    if (x.station.lines.some((l) => !covered.has(l))) {
-      kept.add(x);
-      x.station.lines.forEach((l) => covered.add(l));
-    }
-  }
-  return sorted.filter((x) => kept.has(x)).slice(0, max);
-}
+import { walkSeconds } from "../../core/util.js";
 
 // Correspondances à pied entre stations proches de noms différents, calculées à la génération
 // (tools/build-transfers.mjs) : [idA, idB, mètres, tracé encodé ou null] → Map station id → [{ to,
@@ -130,12 +37,12 @@ export const SERVICE_GAP_MS = 2 * 3600 * 1000;
 export const TRANSFER_MS = 2 * MIN;
 // Marge ajoutée à la marche jusqu'à l'arrêt de départ : on part 2 min plus tôt que le strict nécessaire.
 export const WALK_MARGIN_MS = 2 * MIN;
-export const MAX_TRANSFERS = 2;
+const MAX_TRANSFERS = 2;
 // Tracé « le plus pratique » : l'heure limite de départ, diminuée de l'effort du trajet. Chaque
 // minute de marche (jusqu'à l'arrêt et jusqu'au domicile) compte une fois de plus, chaque
 // correspondance compte 10 min (choix de l'auteur, 22/10/2026).
-export const WALK_PENALTY = 1;
-export const TRANSFER_PENALTY_MS = 10 * MIN;
+const WALK_PENALTY = 1;
+const TRANSFER_PENALTY_MS = 10 * MIN;
 
 // Horaires à charger d'après le graphe du réseau (ordre des arrêts par ligne et par sens), avant
 // tout appel : [{ line, direction }]. Garde les motifs utiles à un trajet d'au plus `extraTransfers`
@@ -317,99 +224,6 @@ function firstFrom(list, t, skipJourney) {
   return list[lo] ?? null;
 }
 
-// Fin du service en cours : la prochaine occurrence, après `now`, de l'heure `hour` dans le
-// fuseau du réseau (3 h du matin à Bordeaux). Le dernier tram est le dernier départ avant elle.
-// L'API renvoie environ les 12 heures à venir, nuit comprise : sans cette coupure, le « dernier
-// tram » du soir serait un tram du lendemain midi. La nuit d'un changement d'heure, la coupure
-// peut être décalée d'une heure.
-export function serviceEndAfter(now, { timeZone, hour }) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone,
-      hourCycle: "h23",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    })
-      .formatToParts(now)
-      .map((p) => [p.type, Number(p.value)]),
-  );
-  // Heure locale lue comme si elle était UTC : l'écart avec `now` donne le décalage du fuseau.
-  const localAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-  const offset = localAsUtc - Math.floor(now / 1000) * 1000;
-  let end = Date.UTC(parts.year, parts.month - 1, parts.day, hour);
-  if (end <= localAsUtc) end += 24 * 3600 * 1000;
-  return end - offset;
-}
-
-// Date locale d'un instant dans le fuseau du réseau : { year, month, day, weekday } (0 = dimanche).
-export function localDate(ms, timeZone) {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
-      .formatToParts(ms)
-      .map((p) => [p.type, Number(p.value)]),
-  );
-  return addDays(parts, 0);
-}
-
-export function addDays({ year, month, day }, n) {
-  const d = new Date(Date.UTC(year, month - 1, day + n));
-  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), weekday: d.getUTCDay() };
-}
-
-// Matin de la nuit de service en cours : la date locale de sa fin. La nuit du jeudi au vendredi
-// a pour matin le vendredi, à 18 h le jeudi comme à 4 h le vendredi.
-export const serviceMorning = (now, { timeZone, hour }) => localDate(serviceEndAfter(now, { timeZone, hour }), timeZone);
-
-// Commune d'une adresse de la Géoplateforme (« 12 Rue X 33700 Mérignac » → « merignac »), normalisée
-// pour la comparer à une liste : minuscules, sans accents ni tirets, « St » écrit « saint ».
-export const normCommune = (name) =>
-  name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[-'’]/g, " ")
-    .replace(/\bst\b/g, "saint")
-    .replace(/\s+/g, " ")
-    .trim();
-
-export function communeOf(label) {
-  const m = /\b\d{5}\s+(.+)$/.exec(label ?? "");
-  return m ? normCommune(m[1]) : null;
-}
-
-// Zones à la demande (TBNight) : au-delà de son dernier arrêt fixe, une ligne dessert les arrêts
-// réservés dans certaines communes. Si le domicile est dans l'une d'elles, le dernier arrêt fixe de
-// la ligne devient une arrivée possible, sans marche : on reste dans le bus. L'heure d'arrivée est
-// celle du dernier arrêt fixe (la suite dépend des réservations).
-// zones : [{ line: code, communes: [nom] }] ; renvoie des arrivées au format de nearestStations.
-export function zoneDests({ zones, commune, graph, index, lineCodes }) {
-  if (!zones?.length || !commune || !graph) return [];
-  const out = [];
-  for (const zone of zones) {
-    const match = zone.communes.find((c) => normCommune(c) === commune);
-    if (!match) continue;
-    for (const p of graph.patterns) {
-      if (lineCodes[p.line] !== zone.line) continue;
-      const last = p.stops[p.stops.length - 1];
-      const station = index.stationFor({ ref: last, name: graph.names?.[last] ?? "" });
-      if (station && !out.some((d) => d.station.id === station.id)) {
-        out.push({ station, walk: { straight: 0, meters: 0, minutes: 0 }, zone: { line: zone.line, commune: match } });
-      }
-    }
-  }
-  return out;
-}
-
-// Plage horaire où le compte à rebours fonctionne (de 18 h à 3 h à Bordeaux), qui peut passer
-// minuit. On y est quand sa fin arrive avant son prochain début.
-export function inServiceWindow(now, { timeZone, startHour, endHour }) {
-  return serviceEndAfter(now, { timeZone, hour: endHour }) < serviceEndAfter(now, { timeZone, hour: startHour });
-}
-
 // Un trajet qui repasse par une station déjà visitée (partir de Hôtel de Ville pour y revenir par
 // une autre ligne, gagner quelques minutes de départ par une boucle) n'a pas de sens : on l'écarte.
 // Une correspondance dans la même station (descente et montée au même endroit) n'est pas une boucle.
@@ -461,7 +275,7 @@ function itinerary(entry, lineCodes, index) {
 // Une option par couple (station de départ, nombre de correspondances), toutes lignes confondues.
 // Les courses partielles (qui s'arrêtent avant la station d'arrivée) ne servent que si une
 // correspondance permet de finir le trajet.
-// `serviceEnd` : fin du service en cours (serviceEndAfter) ; aucun tronçon ne part après elle.
+// `serviceEnd` : fin du service en cours (serviceEndAfter, js/core/dates.js) ; aucun tronçon ne part après elle.
 // `serviceGap` : au-delà de cet écart avant le prochain départ, la journée est finie (statut
 // `ended`). Infinity pour le prochain bus de nuit, qui peut passer plusieurs heures plus tard.
 // `transfers` : correspondances à pied (transferMap), facultatives.

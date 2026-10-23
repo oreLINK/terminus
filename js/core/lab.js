@@ -1,4 +1,4 @@
-// Mode test, sur le poste de développement seulement (npm run serve, puis /lab/) : la page
+// Simon — simule pour déboguer. Mode test, sur le poste de développement seulement (npm run serve, puis /lab/) : la page
 // lab enregistre des réglages que le site applique (horloge, plage horaire, écrans forcés).
 // Hors de localhost, `lab` vaut toujours null et l'horloge est l'heure réelle.
 

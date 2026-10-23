@@ -1,11 +1,15 @@
 // Mode « Le dernier tram » : combien de temps avant de devoir partir
 // à pied pour attraper le dernier tram qui ramène au domicile, directement ou avec correspondance.
 
-import { buildIndex, candidateStations, transferMap, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, serviceMorning, addDays, communeOf, zoneDests, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { transferMap, candidateLines, routeRequests, plan, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
+import { buildIndex, candidateStations, zoneDests } from "../../core/stations.js";
+import { serviceEndAfter, inServiceWindow, serviceMorning, addDays, isoDate } from "../../core/dates.js";
+import { communeOf } from "../../core/text.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc, distanceM } from "../../core/util.js";
+import { icon } from "../../core/icons.js";
 import { fetchWalk, realWalk } from "../../core/walk-route.js";
-import { eveningJourneys, mergeLive, isoDate } from "../../core/timetable.js";
+import { eveningJourneys, mergeLive } from "../../core/timetable.js";
 import { decodeLine } from "../../core/line-trace.js";
 import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
@@ -41,18 +45,17 @@ const MODES = ["comfortable", "latest"];
 // Adresse du domicile masquée dans sa pastille (par défaut), contre les regards par-dessus l'épaule.
 const HIDE_HOME_KEY = "dt.home-hidden.v1";
 
-// Pictogrammes des trois blocs : une cible pour la position, l'avant d'un tram pour l'arrêt,
-// une maison pour le domicile.
+// Pictogrammes de la tuile (js/core/icons.js), chacun avec sa classe.
 const ICONS = {
-  here: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/></svg>`,
-  home: `<svg class="trip-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg>`,
-  go: `<svg class="route-go-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4 4 11l7 2 2 7 7-16Z"/></svg>`,
-  refresh: `<svg class="meta-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>`,
-  walk: `<svg class="summary-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="4.5" r="1.8"/><path d="M12.5 8 10 14l3.5 3 1.5 4.5M10 14l-2 7M11.5 9.5 8 12v3M13 8.5l2.5 3.5H19"/></svg>`,
-  expand: `<svg class="expand-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-6.5 6.5M4 20l6.5-6.5"/></svg>`,
+  here: icon("locate", "trip-glyph"),
+  home: icon("home", "trip-glyph"),
+  go: icon("go", "route-go-glyph"),
+  refresh: icon("refresh", "meta-glyph"),
+  walk: icon("walk", "summary-glyph"),
+  expand: icon("expand", "expand-glyph"),
   // Œil : afficher l'adresse ; œil barré : la masquer (l'action que fait le bouton de l'en-tête).
-  eye: `<svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>`,
-  eyeOff: `<svg class="picker-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5.8c.6-.2 1.3-.3 2-.3 6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.6 3.4M6.3 7.3A16.5 16.5 0 0 0 2.5 12S6 18.5 12 18.5c1.8 0 3.3-.5 4.6-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2M3.5 3.5l17 17"/></svg>`,
+  eye: icon("eye", "picker-icon"),
+  eyeOff: icon("eyeOff", "picker-icon"),
 };
 
 // Barre fine où glisse un segment, comme un tram sur sa ligne : visible pendant un calcul.

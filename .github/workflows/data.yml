@@ -1,4 +1,4 @@
-# Chaque semaine (et à la demande) : recharge les données tirées du GTFS de TBM (arrêts et graphe des
+# Ravi — ravitaille les données. Chaque semaine (et à la demande) : recharge les données tirées du GTFS de TBM (arrêts et graphe des
 # bus de jour, correspondances à pied, horaires du soir, tracés des lignes) sur une branche data-refresh créée depuis main, ouvre une pull request vers main,
 # attend que ses vérifications (l'Action « Tests ») passent, la fusionne, puis supprime la branche.
 # Les horaires couvrent 21 jours : une semaine manquée ne casse rien, et sans données pour la soirée le

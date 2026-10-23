@@ -1,4 +1,4 @@
-// Carte interactive : Leaflet (copié dans vendor/leaflet/, licence BSD 2 clauses) sur le fond
+// Carla — les cartes. Carte interactive : Leaflet (copié dans vendor/leaflet/, licence BSD 2 clauses) sur le fond
 // Plan IGN de la Géoplateforme, sans clé. Leaflet n'est chargé qu'à la première carte affichée,
 // après le rendu : l'écran n'attend pas ses 43 Ko compressés pour montrer le compte à rebours.
 

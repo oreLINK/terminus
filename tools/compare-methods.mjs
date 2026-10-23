@@ -1,4 +1,4 @@
-// Compare, pour un mode (le tram par défaut), l'ancienne méthode (horaires SIRI par ligne) et la nouvelle (horaires
+// Jules — juge l'ancienne méthode contre la nouvelle. Compare, pour un mode (le tram par défaut), l'ancienne méthode (horaires SIRI par ligne) et la nouvelle (horaires
 // théoriques inclus, evening/) : c'est le test de fiabilité de l'étape 1 (CONTEXT.md, section 11,
 // piste 10). Deux parties :
 //   1. les données : chaque course SIRI doit exister dans les horaires inclus, avec le même sens, les
@@ -12,10 +12,11 @@
 
 import tbm from "../js/networks/bordeaux-tbm/index.js";
 import { loadTimetable } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, candidateStations, transferMap, plan, serviceEndAfter, serviceMorning, addDays } from "../js/features/last-ride/planner.js";
+import { transferMap, plan } from "../js/features/last-ride/planner.js";
+import { buildIndex, candidateStations } from "../js/core/stations.js";
+import { serviceEndAfter, serviceMorning, addDays, zonedTime, isoDate } from "../js/core/dates.js";
 import { decodeLine } from "../js/core/line-trace.js";
-import { eveningJourneys, isoDate } from "../js/core/timetable.js";
-import { zonedTime } from "../js/core/util.js";
+import { eveningJourneys } from "../js/core/timetable.js";
 
 const raw = (name) => {
   const i = process.argv.indexOf(`--${name}`);

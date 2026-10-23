@@ -14,15 +14,13 @@ import { fileURLToPath } from "node:url";
 import tramStops from "../js/networks/bordeaux-tbm/stops.js";
 import nightStops from "../js/networks/bordeaux-tbm/night-stops.js";
 import busStops from "../js/networks/bordeaux-tbm/bus-stops.js";
-import { withGtfs } from "./gtfs.mjs";
+import { withGtfs, TIME_ZONE, todayIn, routeOf, secs, nextDates, activeServices } from "./gtfs.mjs";
 
 const EVENING_DIR = new URL("../js/networks/bordeaux-tbm/evening/", import.meta.url);
-const TIME_ZONE = "Europe/Paris";
 const DAYS = 21;
 const SINCE_S = 17 * 3600; // une course est gardée si elle passe après 17 h
 
 // Lignes des arrêts générés : refs SIRI « bordeaux:Line:59:LOC » → route_id GTFS « 59 ».
-const routeOf = (ref) => /^bordeaux:Line:(.+):LOC$/.exec(ref)?.[1];
 const routesOf = (stops) => new Set(Object.keys(stops.lines).map(routeOf).filter(Boolean));
 // allDay : toutes les courses (lignes de nuit), sinon celles qui passent après 17 h.
 const KINDS = [
@@ -32,14 +30,6 @@ const KINDS = [
 ];
 const wanted = new Set(KINDS.flatMap((k) => [...k.routes]));
 
-const ymd = (d) => d.toISOString().slice(0, 10);
-const compact = (s) => s.replaceAll("-", "");
-const secs = (hms) => {
-  const [h, m, s] = hms.split(":").map(Number);
-  return h * 3600 + m * 60 + s;
-};
-const weekday = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-
 await withGtfs(async ({ read, stream }) => {
   const feed = read("feed_info.txt")[0];
   const routes = new Set(read("routes.txt").map((r) => r.route_id).filter((id) => wanted.has(id)));
@@ -47,8 +37,6 @@ await withGtfs(async ({ read, stream }) => {
   for (const t of read("trips.txt")) {
     if (routes.has(t.route_id)) trips.set(t.trip_id, { id: t.trip_id, route: t.route_id, dir: t.direction_id, service: t.service_id, calls: [] });
   }
-  const calendar = read("calendar.txt");
-  const exceptions = read("calendar_dates.txt");
 
   await stream("stop_times.txt", (st) => {
     const t = trips.get(st.trip_id);
@@ -56,24 +44,9 @@ await withGtfs(async ({ read, stream }) => {
   });
 
   // Jours de service : du jour de la génération (heure de Paris) aux 21 suivants, sans dépasser le GTFS.
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date());
-  const dates = [];
-  for (let i = 0; i < DAYS; i++) {
-    const d = new Date(`${today}T12:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + i);
-    if (compact(ymd(d)) <= feed.feed_end_date) dates.push(ymd(d));
-  }
-  const activeOn = (date) => {
-    const c = compact(date);
-    const day = weekday[new Date(`${date}T12:00:00Z`).getUTCDay()];
-    const on = new Set(calendar.filter((s) => s.start_date <= c && c <= s.end_date && s[day] === "1").map((s) => s.service_id));
-    for (const e of exceptions) {
-      if (e.date !== c) continue;
-      if (e.exception_type === "1") on.add(e.service_id);
-      else on.delete(e.service_id);
-    }
-    return on;
-  };
+  const today = todayIn();
+  const dates = nextDates(DAYS, feed.feed_end_date);
+  const activeOn = activeServices(read);
 
   if (!dates.length) throw new Error("Aucun jour : le GTFS ne couvre pas les jours à venir.");
   const j = JSON.stringify;

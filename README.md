@@ -123,7 +123,7 @@ Le site est découpé en trois couches pour accueillir d'autres villes et d'autr
 
 - `js/networks/` : un dossier par réseau de transport (ville, zone, couleurs de lignes, sources, adaptateurs d'API).
 - `js/features/` : un dossier par mode (aujourd'hui quatre : « Le dernier tram », `last-ride`, « Le dernier bus », `last-bus`, « Le dernier transport », `last-transport`, et « Le prochain bus de nuit », `night-ride`).
-- `js/core/` : ce qui est commun (position, destination, stockage, feuilles, champ d'adresse, géocodage).
+- `js/core/` : ce qui est commun (position, destination, stockage, feuilles, champ d'adresse, géocodage, dates, index des stations, pictogrammes) et les outils internes nommés (Max, Inès, Léa, Rémi…, tableau dans `CONTEXT.md`, section 4).
 
 `js/app.js` choisit la ville et le mode (automatiquement ou via les sélecteurs de l'en-tête) et monte le module correspondant. Les interfaces sont détaillées dans [CONTEXT.md](CONTEXT.md), section 4.
 
@@ -149,7 +149,7 @@ confidentialite.html                 données personnelles et bouton d'effacemen
 vendor/leaflet/                      Leaflet 1.9.4 (carte), copié tel quel avec sa licence
 css/style.css                        styles et jetons de design
 js/app.js                            choix de la ville et de l'information, montage
-js/core/                             position, destination, stockage, feuilles, adresses, utilitaires
+js/core/                             position, destination, stockage, feuilles, adresses, dates, stations, icônes, utilitaires
 js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)

@@ -1,4 +1,4 @@
-// Accès au flux SIRI-Lite public de Bordeaux Métropole (réseau TBM).
+// Sam — le seul qui appelle TBM en temps réel. Accès au flux SIRI-Lite public de Bordeaux Métropole (réseau TBM).
 // Doc : https://transport.data.gouv.fr/datasets/offres-de-services-bus-tram-et-scolaire-au-format-gtfs-netex-gtfs-rt-siri-lite
 // La clé ci-dessous est la clé open data publique et partagée.
 
@@ -9,7 +9,7 @@ const TIMETABLE_TTL_MS = 100 * 1000;
 const TIMETABLES_KEY = "dt.timetables.v1"; // sessionStorage : horaires gardés pour la soirée
 const TIMETABLES_KEEP_MS = 15 * 60 * 1000;
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(kind, message) {
     super(message);
     this.kind = kind;
@@ -17,7 +17,7 @@ export class ApiError extends Error {
 }
 
 // Les références SIRI-Lite arrivent sous plusieurs formes : "x", {value: "x"} ou [{value: "x"}].
-export const val = (x) => {
+const val = (x) => {
   if (x == null) return "";
   if (typeof x === "string") return x;
   if (Array.isArray(x)) return val(x[0]);
@@ -27,7 +27,7 @@ export const val = (x) => {
 const asArray = (x) => (x == null ? [] : Array.isArray(x) ? x : [x]);
 const toMs = (iso) => (iso ? Date.parse(iso) : null);
 
-export function isInGironde(lat, lon) {
+function isInGironde(lat, lon) {
   return Number.isFinite(lat) && Number.isFinite(lon) && lat > 44.1 && lat < 45.6 && lon > -1.3 && lon < 0.35;
 }
 
@@ -50,7 +50,7 @@ async function siri(endpoint, params = {}, signal) {
 // Familles de lignes : (nom, code de l'API) → code affiché, ou null si la ligne n'en fait pas partie.
 // Le code de l'API est faux pour TBNight (vérifié le 01/10/2026 : « TBNight » pour la N1, « N1 »
 // pour la N8, « N2 » à « N7 » justes) : on prend le numéro dans le nom, « TBNight N8 ».
-export const LINE_KINDS = {
+const LINE_KINDS = {
   tram: (name, code) => (/^tram\b/i.test(name) && /^[a-f]$/i.test(code) ? code.toUpperCase() : null),
   night: (name) => name.match(/^tbnight (n\d)$/i)?.[1].toUpperCase() ?? null,
 };

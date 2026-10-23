@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildIndex, transferMap } from "../js/features/last-ride/planner.js";
+import { transferMap } from "../js/features/last-ride/planner.js";
+import { buildIndex } from "../js/core/stations.js";
 import { decodeLine } from "../js/core/line-trace.js";
 import { distanceM } from "../js/core/util.js";
 import tbm from "../js/networks/bordeaux-tbm/index.js";

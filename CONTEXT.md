@@ -73,10 +73,10 @@ Terminus est organisé pour accueillir plusieurs **réseaux** (une compagnie de 
 
 - **Réseau** (`js/networks/<id>/index.js`) : un objet de configuration. Il décrit la ville (`id`, `city`, `name`), sa zone desservie (`coverage`, boîte qui sert au choix automatique de la ville), la zone des adresses (`area` : département pour la Géoplateforme, boîte, centre, exemple d'adresse), les couleurs de lignes, les mentions de source (`attribution`) et, dans `features`, **un adaptateur par mode qu'il sait fournir**. Le code propre à l'API du réseau vit à côté (pour TBM : `siri-lite.js`).
 - **Mode** (`js/features/<id>/index.js`) : exporte `{ id, title, short, description, mount }`. `mount({ root, network, adapter })` dessine dans `<main>` et renvoie `{ unmount() }`, qui doit tout libérer (minuteries, écouteurs, abonnement à la position). Sa logique de calcul pure vit à côté (pour `last-ride` : `planner.js`).
-- **Adaptateur `last-ride`** attendu d'un réseau : `vehicle` (mot affiché, « tram »), `serviceEndHour` facultatif (heure locale de fin du service du soir, 3 pour TBM ; le réseau déclare alors son `timeZone`), `serviceStartHour` facultatif (avec `serviceEndHour` : début de la plage horaire où le compte à rebours fonctionne, 18 pour TBM ; hors de la plage, écran d'attente neutre « Dès 18 h » sans appel à l'API, destination et position restant modifiables ; `inServiceWindow` dans `planner.js`, bascule vérifiée à chaque rafraîchissement de 30 s et au retour sur l'onglet), `loadStops()` → `{ lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }`, `loadTimetable(lineRef, direction)` → courses `[{ id, line, headsign, calls: [{ ref, name, dep, depLive, arr, arrLive, cancelled }] }]`, `clearCache()` facultatif, `loadGraph()` facultatif → `{ generatedAt, names: { [ref]: nom }, patterns: [{ line, direction, stops: [ref] }] }` (ordre des arrêts par ligne et par sens, voir section 6 ; sans lui, les horaires sont chargés à l'aveugle). Champs propres au réseau de nuit, aussi lus par l'écran partagé : `nightHint` facultatif (phrase ajoutée aux écrans sans trajet), `runsOn(matin)` facultatif (`{ year, month, day, weekday }` du matin de la nuit en cours, `serviceMorning` → la nuit circule-t-elle ?), `serviceName` et `nights` (texte de l'écran « Pas de service cette nuit »), `zones` facultatif (`[{ line: code, communes: [nom] }]`, zones à la demande), `zoneInfoUrl`.
+- **Adaptateur `last-ride`** attendu d'un réseau : `vehicle` (mot affiché, « tram »), `serviceEndHour` facultatif (heure locale de fin du service du soir, 3 pour TBM ; le réseau déclare alors son `timeZone`), `serviceStartHour` facultatif (avec `serviceEndHour` : début de la plage horaire où le compte à rebours fonctionne, 18 pour TBM ; hors de la plage, écran d'attente neutre « Dès 18 h » sans appel à l'API, destination et position restant modifiables ; `inServiceWindow` dans `js/core/dates.js`, bascule vérifiée à chaque rafraîchissement de 30 s et au retour sur l'onglet), `loadStops()` → `{ lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }`, `loadTimetable(lineRef, direction)` → courses `[{ id, line, headsign, calls: [{ ref, name, dep, depLive, arr, arrLive, cancelled }] }]`, `clearCache()` facultatif, `loadGraph()` facultatif → `{ generatedAt, names: { [ref]: nom }, patterns: [{ line, direction, stops: [ref] }] }` (ordre des arrêts par ligne et par sens, voir section 6 ; sans lui, les horaires sont chargés à l'aveugle). Champs propres au réseau de nuit, aussi lus par l'écran partagé : `nightHint` facultatif (phrase ajoutée aux écrans sans trajet), `runsOn(matin)` facultatif (`{ year, month, day, weekday }` du matin de la nuit en cours, `serviceMorning` → la nuit circule-t-elle ?), `serviceName` et `nights` (texte de l'écran « Pas de service cette nuit »), `zones` facultatif (`[{ line: code, communes: [nom] }]`, zones à la demande), `zoneInfoUrl`.
 - **Mode `night-ride`** (« Le prochain bus de nuit », `js/features/night-ride/index.js`, 01/10/2026 ; visait le dernier bus de nuit jusqu'au 22/10/2026) : réutilise `mount` de `last-ride` (exporté) avec l'adaptateur `night-ride` du réseau et `goal: "next"`. Ce but change trois choses : le tracé affiché est `result.soonest` (`soonestOf` dans `planner.js` : de chaque arrêt, le premier départ encore atteignable ; parmi eux, l'arrivée à la destination la plus tôt, marche jusqu'à l'arrêt × `WALK_PENALTY` et correspondances × `TRANSFER_PENALTY_MS` ajoutées, comme pour le plus pratique ; à égalité, le départ le plus tôt) ; pas de choix « Plus pratique » / « Plus tard possible » ; pas de statut `ended` par l'écart de 2 h (`serviceGap: Infinity`), car le prochain bus peut passer des heures après le début du compte à rebours (à 22 h, le premier N1 est à 1 h 10) : seule la fin du service (6 h) borne la nuit. Quand le bus visé est parti, le recalcul suivant (30 s) passe au suivant. Tout ce qui dépend du véhicule passe par l'adaptateur : textes (`vehicle` : « Plus de bus de nuit ce soir »…), plage horaire, nuits de service, zones. Tram et TBNight ne se combinent pas (choix de l'auteur : mode séparé).
 - **Coquille** (`js/app.js`) : choisit le réseau puis le mode, monte le module, peint les sélecteurs de l'en-tête et le pied de page. Ville : choix manuel, sinon réseau dont `coverage` contient la position, sinon dernier réseau connu, sinon le premier. Type : choix manuel s'il existe sur ce réseau, sinon `DEFAULT_FEATURE` (`last-ride`). Une nouvelle position en mode automatique peut faire changer de ville (démontage puis remontage).
-- **Commun** (`js/core/`) : position partagée (`location.js`), destination par réseau (`home.js`), stockage sûr (`storage.js`), feuilles (`sheet.js`), champ et géocodage d'adresses paramétrés par la zone du réseau (`address-field.js`, `geocode.js`), indicateur de calcul (`computing.js`), utilitaires (`util.js`).
+- **Commun** (`js/core/`) : position partagée (`location.js`), destination par réseau (`home.js`), stockage sûr (`storage.js`), feuilles (`sheet.js`), champ et géocodage d'adresses paramétrés par la zone du réseau (`address-field.js`, `geocode.js`), indicateur de calcul (`computing.js`), heures et jours (`dates.js`), noms comparables (`text.js`), index des stations (`stations.js`), pictogrammes (`icons.js`), utilitaires (`util.js`), et les outils nommés (voir « Les outils internes »).
 
 ```
 index.html                          coquille : fond d'ambiance (.ambient), en-tête (logo, œil de la destination,
@@ -94,10 +94,14 @@ js/core/address-field.js            champ d'adresse (combobox ARIA)
 js/core/geocode.js                  autocomplétion d'adresses (Géoplateforme IGN), zone fournie par le réseau
 js/core/computing.js                indicateur « calcul en cours »
 js/core/ambient.js                  ton de la fenêtre (data-tone sur <html>) et couleur de la barre du navigateur
-js/core/util.js                     distance, marche, heures, échappement HTML, inBounds
+js/core/util.js                     distance, marche, heure affichée, échappement HTML, inBounds
+js/core/dates.js                    heures et jours dans un fuseau : zonedTime, fin du service, plage horaire, isoDate
+js/core/text.js                     noms comparables : normName, normCommune, communeOf
+js/core/stations.js                 Inès : index des stations, candidats, zones à la demande
+js/core/icons.js                    pictogrammes du site, icon(nom, classe)
 js/core/map.js                      carte Leaflet sur fond Plan IGN, Leaflet chargé à la première carte
 js/core/season.js                   thème de saison : data-season, feuille et animations du thème, seasonText
-js/themes/index.js                  calendrier des thèmes (dates, fichiers, textes), activeTheme, zonedTime
+js/themes/index.js                  calendrier des thèmes (dates, fichiers, textes), activeTheme
 js/themes/halloween-2026/           thème Halloween 2026 : theme.css (couleurs, décor), decorations.js (animations)
 THEMES.md                           calendrier des thèmes et procédure (dates, ajout), tenu à jour avec js/themes/
 vendor/leaflet/                     Leaflet 1.9.4 (leaflet.js minifié, leaflet.css, LICENSE), copié tel quel
@@ -113,7 +117,7 @@ tools/build-transfers.mjs           génère transfers.js, night-transfers.js et
 tools/build-shapes.mjs              génère shapes.js, le tracé réel des lignes, depuis le GTFS TBM (npm run shapes)
 tools/build-timetable.mjs           génère evening/, les horaires théoriques du soir, depuis le GTFS (npm run timetable)
 tools/compare-methods.mjs           compare l'ancienne et la nouvelle méthode de calcul sur le tram (npm run compare)
-tools/gtfs.mjs                      téléchargement et lecture du GTFS TBM, partagés par les générateurs
+tools/gtfs.mjs                      Gus : téléchargement et lecture du GTFS TBM, jours actifs, identifiants, partagés par les générateurs
 js/networks/bordeaux-tbm/evening/   horaires du soir (générés, versionnés), un dossier par mode (tram, night, bus) : index.js et un day-<n>.js par type de jour
 js/networks/bordeaux-tbm/bus-*.js   bus de jour (générés) : bus-stops, bus-graph, bus-shapes, bus-transfers ; transport-transfers.js : correspondances tram et bus
 js/core/compose.js                  assemblage des données de plusieurs modes (arrêts, graphes, tracés), pour un mode combiné
@@ -127,7 +131,7 @@ js/core/lab.js                      réglages du mode test, inertes hors de loca
 js/core/holidays.js                 jours fériés en France (dates fixes + Pâques calculée), pour les veilles de fêtes TBNight
 js/features/index.js                registre des modes, DEFAULT_FEATURE
 js/features/last-ride/index.js      « Le dernier tram » : écrans, calcul, feuilles
-js/features/last-ride/planner.js    logique pure : stations, candidats, options
+js/features/last-ride/planner.js    Bob : itinéraire (profils, correspondances, options, tracés), logique pure
 js/features/last-ride/route-map.js  carte du tracé affiché : aperçu figé de la tuile et carte de la feuille « Votre trajet »
 js/features/last-transport/index.js « Le dernier transport » : tram et bus combinés, données des deux modes assemblées
 js/features/last-bus/index.js       « Le dernier bus » : l'écran de last-ride avec l'adaptateur des bus de jour
@@ -144,6 +148,29 @@ Règles d'architecture :
 - **Rien de propre à un réseau dans `core/` ni dans un mode** : noms, zones, couleurs, messages locaux (`nightHint`) et appels d'API passent par l'objet réseau et son adaptateur.
 - **Aucun accès au DOM au chargement d'un module** : les éléments sont récupérés à l'usage, pour que registres et modules se chargent sous Node dans les tests.
 - Un mode ne touche qu'à `<main>` et aux feuilles ; l'en-tête et le pied de page appartiennent à la coquille. Seule exception : le ton de la fenêtre, qu'il règle par `setAmbient` et remet à « none » en se démontant.
+
+### Les outils internes
+
+Chaque brique réutilisable porte un prénom (choix de l'auteur, 23/10/2026), écrit en tête de son fichier : on dit « Bob ne trouve pas le trajet » ou « Max a dépassé le quota de l'IGN » plutôt que de nommer des fichiers. Un outil a un seul rôle, ne dépend d'aucune fonctionnalité, et reste pur sauf mention contraire (appels réseau indiqués). Les noms de fichiers restent techniques.
+
+| Outil | Rôle | Fichiers | Appels réseau |
+|---|---|---|---|
+| **Max** | La marche à pied : itinéraire piéton par les rues, file d'appels, jamais moins que le vol d'oiseau, estimation × 1,3 en secours | `js/core/walk-route.js`, marches de `js/core/util.js` | IGN, 2 à la fois (aucun pour les correspondances, calculées à la génération) |
+| **Bob** | Construit l'itinéraire : profils à rebours, correspondances (même station ou à pied), le plus tard, le plus pratique, le prochain ; boucles écartées | `js/features/last-ride/planner.js` | aucun |
+| **Inès** | L'index des stations : quais regroupés par nom, stations candidates autour d'un point, arrivées en zone à la demande | `js/core/stations.js` | aucun |
+| **Léa** | Lit les horaires du soir inclus dans le site, au format du flux SIRI | `js/core/timetable.js` (`eveningJourneys`, `buildJourneys`) | aucun (fichiers du site) |
+| **Rémi** | Recolle le temps réel sur les horaires : jumelles, annulations explicites, fantômes ignorés, une absence ne supprime rien | `js/core/timetable.js` (`mergeLive`) | aucun |
+| **Sam** | Le seul qui appelle TBM en temps réel : SIRI-Lite, lecture des réponses, caches | `js/networks/bordeaux-tbm/siri-lite.js` | SIRI, 1 à 3 appels par calcul (nouvelle méthode) |
+| **Colette** | Assemble les données de plusieurs modes (arrêts, graphes, tracés) pour un mode combiné | `js/core/compose.js` | aucun |
+| **Tom** | Le tracé des lignes : encodage, simplification, découpage entre deux quais | `js/core/line-trace.js` | aucun |
+| **Carla** | Les cartes : fond Plan IGN, aperçu figé de la tuile, carte interactive | `js/core/map.js`, `js/features/last-ride/route-map.js` | tuiles IGN |
+| **Coco** | Habille le site selon la saison : calendrier, feuille et animations du thème actif | `js/themes/`, `js/core/season.js`, [THEMES.md](THEMES.md) | aucun |
+| **Gus** | Les générateurs de données à partir du GTFS : téléchargement, lecture, jours actifs, identifiants | `tools/gtfs.mjs`, `tools/build-*.mjs` | GTFS (génération seulement) |
+| **Ravi** | Ravitaille les données chaque lundi : branche `data-refresh`, pull request, fusion si les tests passent | `.github/workflows/data.yml` | GTFS, IGN (nouvelles paires) |
+| **Jules** | Juge l'ancienne méthode contre la nouvelle (test de fiabilité) | `tools/compare-methods.mjs` | SIRI (outil de développement) |
+| **Simon** | Simule une heure, une méthode, un écran pour déboguer, en local seulement | `js/core/lab.js`, `lab/index.html` | aucun |
+
+Briques communes sans prénom : `js/core/dates.js` (heures et jours dans un fuseau, fin du service, plage horaire), `js/core/text.js` (noms d'arrêts et de communes comparables), `js/core/icons.js` (pictogrammes), `js/core/util.js` (distances, heures, échappement HTML).
 
 ## 5. Sources de données
 
@@ -189,7 +216,7 @@ Non utilisé pour l'instant mais disponible : `stop-monitoring.json` (passages �
 - Géocodage inverse (adresse de la position GPS) : `https://data.geopf.fr/geocodage/reverse?lat=…&lon=…&index=address&limit=1`, réponse GeoJSON `features[0].properties.{ label, name }`, en-têtes CORS ouverts (`Access-Control-Allow-Origin: *`). Vérifié le 27/09/2026 en ligne de commande.
 - **Format de réponse réel non vérifié en production.**
 
-## 6. Algorithme (js/features/last-ride/planner.js)
+## 6. Algorithme (Bob, js/features/last-ride/planner.js ; stations : Inès, js/core/stations.js)
 
 1. **Stations** (`buildIndex`) : regroupement des points d'arrêt de tram par nom normalisé (minuscules, sans accents ni ponctuation). Deux homonymes à plus de 600 m restent deux stations. Chaque station garde ses `refs` (quais) et ses lignes. Résolution d'un arrêt de course vers une station : par `StopPointRef`, sinon par nom s'il n'y a qu'une station de ce nom.
 2. **Candidats** (`nearestStations`) : côté départ, stations à moins de 2 km à vol d'oiseau (au moins 2, au plus 8) ; côté destination, moins de 1,5 km (au moins 1, au plus 5).
@@ -279,7 +306,7 @@ Intention : lisible d'une main, la nuit, dehors. **Un seul élément fort : le c
 7. **Lieux connus et stations dans la recherche d'adresse** (demande de l'auteur, 22/10/2026) : dans les suggestions du champ d'adresse (`address-field.js`), pour la position comme pour la destination (aujourd'hui `StreetAddress` seulement pour la destination), placer en tête les correspondances locales, sans appel réseau, avant celles de la Géoplateforme :
    - un **catalogue de lieux célèbres** par réseau (fichier versionné, par exemple `js/networks/bordeaux-tbm/places.js` : nom, autres noms, catégorie, position), déclaré dans la configuration du réseau (rien de propre à Bordeaux dans `core/`) ;
    - les **stations** déjà connues hors ligne : trams (`stops.js`) et TBNight (`night-stops.js`), regroupées par nom comme dans `buildIndex`. Les arrêts des bus de jour viendront avec les modes bus (piste 10), qui les ajoutent aux fichiers générés ;
-   - recherche sans accents ni majuscules, sur le début des mots (« pey » trouve « Place Pey-Berland », « cite du » trouve « La Cité du Vin »), en réutilisant `normName` ; un pictogramme distingue lieu, station et adresse.
+   - recherche sans accents ni majuscules, sur le début des mots (« pey » trouve « Place Pey-Berland », « cite du » trouve « La Cité du Vin »), en réutilisant `normName` (`js/core/text.js`) ; un pictogramme distingue lieu, station et adresse.
 8. **Carte en tuiles vectorielles, Leaflet en secours** (demande de l'auteur, 23/10/2026) : par défaut, le fond Plan IGN en tuiles vectorielles de la Géoplateforme, dessiné par MapLibre GL JS (copié dans `vendor/`, environ 800 Ko, chargé avec la carte seulement), avec un style par apparence et par thème (vrai fond sombre, violet d'Halloween) à la place du filtre d'inversion CSS ; netteté à tous les zooms et noms de rues lisibles. **Secours** : si MapLibre ou le style vectoriel ne sont pas prêts dans un délai donné (par exemple 3 s), ou si WebGL manque ou échoue (vieux téléphone, contexte perdu), la carte actuelle prend le relais : Leaflet et les tuiles images (`js/core/map.js`). Le choix est retenu pour la session, pour ne pas refaire l'attente à chaque rendu. Points d'attention : une interface commune aux deux moteurs pour `route-map.js` (tracés, marches, repères, cadrage, recentrage), l'aperçu figé sans gestes dans les deux cas, la batterie (rendu continu de WebGL), le poids à justifier sur données mobiles, et la page Confidentialité (mêmes données envoyées à l'IGN, sous une autre forme).
 9. **Position en temps réel du véhicule sur la carte** (demande de l'auteur, 23/10/2026) : afficher sur l'aperçu et dans « Votre trajet » le tram ou le bus de nuit du premier tronçon (puis du suivant), pour rassurer. Faisable avec l'API TBM, vérifié le 23/10/2026 : flux GTFS-RT `https://bdx.mecatran.com/utw/ws/gtfsfeed/vehicles/bordeaux?apiKey=…` (même clé publique), CORS ouvert au domaine publié, protobuf d'environ 55 Ko pour tout le réseau (417 véhicules à 10 h), position, cap et `trip_id` par véhicule, positions vieilles de 40 à 60 s. Le `trip_id` du flux (`b_268440007_23`) est contenu dans l'identifiant de course SIRI (`bordeaux:ServiceJourney:b_268440007_23:LOC`) : la correspondance avec le trajet affiché est exacte. Pas de flux SIRI « vehicle-monitoring » (404). À prévoir : un petit décodeur protobuf sans bibliothèque (une soixantaine de lignes), une interrogation toutes les 30 s seulement quand la carte est visible et à moins de 20 à 30 min du départ (environ 2 Mo sur 20 min), un repère qui indique l'âge de la position (ou glisse le long du tracé de la ligne, `shapes.js`), et rien tant que le véhicule n'a pas commencé sa course (il n'est pas encore dans le flux). Présence des bus TBNight dans le flux à vérifier une nuit de service. Le flux des retards de tout le réseau (`gtfsfeed/realtime`, GTFS-RT TripUpdates) existe aussi mais pèse 2,7 Mo (870 Ko compressés) : trop lourd à interroger toutes les 30 s sur un téléphone.
 10. **Bus de jour : modes « Le dernier bus » et « Le dernier transport »** (décision de l'auteur, 23/10/2026, qui revient sur « bus de jour hors sujet » du 22/10 : certains logements ne sont desservis que par le bus, ou par le bus et le tram). « Le dernier bus » : bus de jour seuls ; « Le dernier transport » : trams et bus combinés, correspondances de l'un à l'autre comprises. Ce dernier pourra devenir le mode par défaut de Bordeaux une fois fiable.
@@ -321,7 +348,8 @@ Intention : lisible d'une main, la nuit, dehors. **Un seul élément fort : le c
 - JavaScript moderne en modules ES, sans transpilation. Fonctions courtes, noms en anglais, commentaires et textes d'interface en français.
 - Tout texte venant d'une API passe par `esc()` avant d'être injecté dans le HTML.
 - Les erreurs affichées disent ce qui s'est passé et quoi faire, sans s'excuser.
-- Toute modification de `planner.js` s'accompagne d'un test dans `tests/planner.test.mjs`.
+- Toute modification de `planner.js`, `stations.js` ou `dates.js` s'accompagne d'un test dans `tests/planner.test.mjs` (ou le fichier de test de l'outil).
+- Un outil nommé (section 4, « Les outils internes ») ne dépend d'aucune fonctionnalité : un générateur ou une autre fonctionnalité doit pouvoir l'importer. Une nouvelle brique réutilisable reçoit un prénom, écrit en tête de son fichier et ajouté au tableau.
 - Tout nouveau réseau ou mode doit passer `tests/registry.test.mjs` ; ajouter un test si son interface s'enrichit.
 
 ## 13. Documentation et règles implicites

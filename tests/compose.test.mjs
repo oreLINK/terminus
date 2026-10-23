@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { mergeStops, mergeGraphs, mergeShapes, loadMerged } from "../js/core/compose.js";
-import { buildIndex } from "../js/features/last-ride/planner.js";
+import { buildIndex } from "../js/core/stations.js";
 import { eveningJourneys } from "../js/core/timetable.js";
 
 const tram = {

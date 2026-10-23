@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { buildJourneys, eveningJourneys, mergeLive, isoDate } from "../js/core/timetable.js";
+import { buildJourneys, eveningJourneys, mergeLive } from "../js/core/timetable.js";
+import { isoDate } from "../js/core/dates.js";
 import tbm from "../js/networks/bordeaux-tbm/index.js";
 import index from "../js/networks/bordeaux-tbm/evening/tram/index.js";
 import tramStops from "../js/networks/bordeaux-tbm/stops.js";
