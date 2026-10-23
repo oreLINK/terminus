@@ -33,8 +33,13 @@ export function buildJourneys(index, day, date, refs, lines = null, nameOf = (re
 // Courses théoriques du soir `evening` (AAAA-MM-JJ), et du lendemain `nextDate` si les horaires le
 // demandent (`nextDay` : bus de nuit, que le GTFS range sur le jour du matin), ou null si un jour
 // manque : fichier périmé, l'appelant revient alors à l'ancienne méthode. `source` : { loadIndex(),
-// loadDay(type), refs }.
+// loadDay(type), refs }, ou une liste de sources, assemblées (un mode qui combine tram et bus) : null
+// si l'une manque.
 export async function eveningJourneys(source, evening, nextDate, lines = null, nameOf = undefined) {
+  if (Array.isArray(source)) {
+    const parts = await Promise.all(source.map((s) => eveningJourneys(s, evening, nextDate, lines, nameOf)));
+    return parts.some((p) => p == null) ? null : parts.flat();
+  }
   const index = await source.loadIndex();
   const out = [];
   const dates = index?.nextDay ? [evening, nextDate] : [evening];

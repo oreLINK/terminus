@@ -15,7 +15,7 @@ export default {
     ["gambetta","saint seurin",382,[4484086,-58091,74,-17,-11,-197,3,-23,50,-139]], // Gambetta ↔ Saint-Seurin
     ["gare saint jean rue saint vincent de paul","gare saint jean",197,[4482649,-55747,-24,22,-5,34,8,9,61,23,36,-12,3,-18]], // Gare Saint-Jean (rue Saint-Vincent de Paul) ↔ Gare Saint-Jean
     ["gare saint jean sous la halle","gare saint jean",191,[4482603,-55722,22,-3,-5,34,8,9,58,23,39,-12,3,-18]], // Gare Saint-Jean (sous la Halle) ↔ Gare Saint-Jean
-    ["gare saint jean sous la halle","gare saint jean rue saint vincent de paul",56,[4482603,-55722,19,-1,27,-24]], // Gare Saint-Jean (sous la Halle) ↔ Gare Saint-Jean (rue Saint-Vincent de Paul)
+    ["gare saint jean sous la halle","gare saint jean rue saint vincent de paul",63,[4482603,-55722,19,-1,27,-24]], // Gare Saint-Jean (sous la Halle) ↔ Gare Saint-Jean (rue Saint-Vincent de Paul)
     ["jardin public","quinconces",441,[4484677,-57686,-17,-11,-20,57,-41,-24,-26,77,-47,-10,-34,20,-21,33,-11,37,7,116]], // Jardin Public ↔ Quinconces
     ["journu auber","medoc place saint martial",380,[4485942,-56905,-10,-6,-130,179,106,149]], // Journu Auber ↔ Médoc (Place Saint-Martial)
     ["leybardie","cite chantecrit",488,[4486128,-56271,36,51,216,-314,18,58,20,36]], // Leybardie ↔ Cité Chantecrit

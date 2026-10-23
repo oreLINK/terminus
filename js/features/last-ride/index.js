@@ -367,7 +367,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
       }
 
       // Candidats ligne par ligne : la station la plus proche de chaque ligne, plus les plus proches.
-      const origins = withRealWalks(candidateStations(state.index.stations, here, { radius: 2000, min: 2, max: 10 }), "origins", here);
+      const origins = withRealWalks(candidateStations(state.index.stations, here, adapter.candidates?.origins ?? { radius: 2000, min: 2, max: 10 }), "origins", here);
       // Zones à la demande (TBNight) : si le domicile est dans une commune de zone, le dernier arrêt
       // fixe de la ligne y mène sans marche (on reste dans le bus), même s'il est aussi à portée à pied.
       const zones = zoneDests({
@@ -377,7 +377,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
         index: state.index,
         lineCodes: state.lineCodes,
       });
-      const near = withRealWalks(candidateStations(state.index.stations, state.home, { radius: 1500, min: 1, max: 8 }), "dests", state.home);
+      const near = withRealWalks(candidateStations(state.index.stations, state.home, adapter.candidates?.dests ?? { radius: 1500, min: 1, max: 8 }), "dests", state.home);
       const dests = [...near.filter((d) => !zones.some((z) => z.station.id === d.station.id)), ...zones];
       const loaded = new Set();
       let journeys = [];
@@ -577,7 +577,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
       .map((c) => {
         const color = lineColorOf(c);
         const style = color ? ` style="--line: ${color}; --line-ink: ${lineInkOf(c)}"` : "";
-        return `<span class="line-badge"${style} aria-label="${esc(adapter.vehicle)} ${esc(c)}">${esc(c)}</span>`;
+        return `<span class="line-badge"${style} aria-label="${esc(adapter.lineLabel ?? adapter.vehicle)} ${esc(c)}">${esc(c)}</span>`;
       })
       .join("");
 

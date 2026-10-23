@@ -131,7 +131,13 @@ const stations = index.stations.filter((s) => s.lines.some((l) => lineCodes[l]))
 const pick = () => stations[Math.floor(random() * stations.length)];
 const jitter = (s) => ({ lat: s.lat + (random() - 0.5) * 0.004, lon: s.lon + (random() - 0.5) * 0.004 });
 const legsKey = (o) => o?.last.legs.map((l) => `${lineCodes[l.line]}:${l.journeyId}@${l.from.name}`).join(" + ") ?? "aucun";
-const tally = { same: 0, delay: 0, different: 0, phantom: 0, stale: 0, none: 0 };
+const tally = { same: 0, delay: 0, different: 0, phantom: 0, stale: 0, realtime: 0, none: 0 };
+// Le tracé SIRI emprunte-t-il des courses que les horaires inclus connaissent aussi, dont l'une est
+// suivie en direct ? Alors c'est le temps réel (une avance, un retard) qui change la correspondance ou
+// le meilleur arrêt, pas les données (constaté : un bus en avance de 3 min 30 rend possible une
+// correspondance impossible sur l'horaire).
+const liveLeg = (l) => liveByIdList.get(l.journeyId)?.find((x) => Math.abs(x.calls[0].dep - l.dep) < 6 * 3600 * 1000);
+const realtimeShift = (o) => o?.last.legs.every((l) => { const j = liveLeg(l); return j && twinOf(j); }) && o.last.legs.some((l) => liveLeg(l)?.calls.some((c) => c.depLive));
 // Le tracé SIRI emprunte-t-il une course absente des horaires inclus ce soir et jamais suivie en direct ?
 const usesPhantom = (o) =>
   o?.last.legs.some((l) => {
@@ -170,6 +176,7 @@ while (tested < PAIRS) {
     else if (kx === ky) tally.delay++;
     else if (usesPhantom(x)) tally.phantom++;
     else if (usesStale(y)) tally.stale++;
+    else if (realtimeShift(x)) tally.realtime++;
     else {
       tally.different++;
       details.push(`  ${kind === "primary" ? "le plus tard" : "le prochain"}, ${a.name} → ${b.name}\n    SIRI     ${kx} (avant ${x ? fmt(x.leaveBy) : "—"})\n    inclus   ${ky} (avant ${y ? fmt(y.leaveBy) : "—"})`);
@@ -182,6 +189,7 @@ console.log(`  Mêmes courses, même heure limite : ${tally.same}/${total} (${pc
 console.log(`  Mêmes courses, heure différente (temps réel) : ${tally.delay}`);
 console.log(`  SIRI s'appuie sur une course fantôme (absente du GTFS ce soir, jamais suivie) : ${tally.phantom}`);
 console.log(`  Les horaires inclus trouvent une course que SIRI n'a qu'à la date de la veille : ${tally.stale}`);
+console.log(`  Le temps réel change la correspondance ou l'arrêt (mêmes courses connues des deux côtés) : ${tally.realtime}`);
 console.log(`  Autres écarts, à examiner : ${tally.different}${tally.none ? ` ; sans trajet dans les deux : ${tally.none}` : ""}`);
 console.log(`  Tracés avec une correspondance à pied (horaires inclus) : ${walkingTransfers}`);
 for (const d of details.slice(0, 8)) console.log(d);

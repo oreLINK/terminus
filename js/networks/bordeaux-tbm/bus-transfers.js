@@ -167,7 +167,7 @@ export default {
     ["cimetiere nord av perie","college rosa bonheur",138,[4487580,-59021,-3,-46,-89,27]], // Cimetière Nord (av Périé) ↔ Collège Rosa Bonheur
     ["cimetiere nord devant le cimetiere","cimetiere nord av perie",58,[4487558,-59061,19,-6,3,46]], // Cimetière Nord (devant le Cimetière) ↔ Cimetière Nord (av Périé)
     ["cimetiere nord","cimetiere nord av perie",104,[4487636,-59088,-59,21,3,46]], // Cimetière Nord ↔ Cimetière Nord (av Périé)
-    ["cimetiere nord","cimetiere nord devant le cimetiere",89,[4487636,-59088,-78,27]], // Cimetière Nord ↔ Cimetière Nord (devant le Cimetière)
+    ["cimetiere nord","cimetiere nord devant le cimetiere",90,[4487636,-59088,-78,27]], // Cimetière Nord ↔ Cimetière Nord (devant le Cimetière)
     ["cimetiere nord","college rosa bonheur",169,[4487636,-59088,-148,48]], // Cimetière Nord ↔ Collège Rosa Bonheur
     ["cimetiere nord","les jardins d auriane",560,[4487636,-59088,104,-38,77,-43,16,-1,2,-42,-96,-351]], // Cimetière Nord ↔ Les Jardins d'Auriane
     ["cimetiere","avenue jean jaures",375,[4481084,-62529,59,67,-135,60,-94,64,-9,-18]], // Cimetière ↔ Avenue Jean Jaurès
@@ -282,12 +282,12 @@ export default {
     ["gare de blanquefort av du 11 novembre","gare de blanquefort tram e",351,[4491616,-62730,10,-6,10,13,42,28,41,59,21,68,12,158,20,1]], // Gare de Blanquefort (av du 11 Novembre) ↔ Gare de Blanquefort (Tram E)
     ["gare de bruges rue louis fleurenceau","gare de bruges",202,[4488546,-60994,16,-97,105,51]], // Gare de Bruges (rue Louis Fleurenceau) ↔ Gare de Bruges
     ["gare de bruges rue louis fleurenceau","gare de bruges tram e",292,[4488546,-60994,16,-97,136,65,48,9]], // Gare de Bruges (rue Louis Fleurenceau) ↔ Gare de Bruges (tram E)
-    ["gare de bruges tram e","gare de bruges terminus",25,[4488746,-61017,-22,0]], // Gare de Bruges (tram E) ↔ Gare de Bruges (Terminus)
+    ["gare de bruges tram e","gare de bruges terminus",26,[4488746,-61017,-22,0]], // Gare de Bruges (tram E) ↔ Gare de Bruges (Terminus)
     ["gare routiere av du gal de gaulle","mairie de saint medard",455,[4489648,-72166,-68,68,-25,102,-7,88,3,129,53,-2,40,-11]], // Gare Routière (av du Gal de Gaulle) ↔ Mairie de Saint-Médard
     ["gare saint jean arret de descente","bauducheu",510,[4482486,-55705,56,21,14,-17,2,-24,-46,-5,-91,-48,-19,-13,-5,-15,-13,2,-141,-140]], // Gare Saint-Jean (arrêt de Descente) ↔ Bauducheu
     ["gare saint jean arret de descente","gare saint jean rue saint vincent de paul",211,[4482486,-55705,56,21,14,-17,2,-24,64,2,27,-24]], // Gare Saint-Jean (arrêt de Descente) ↔ Gare Saint-Jean (rue Saint-Vincent de Paul)
     ["gare saint jean arret de descente","gare saint jean sous la halle",154,[4482486,-55705,56,21,14,-17,2,-24,45,3]], // Gare Saint-Jean (arrêt de Descente) ↔ Gare Saint-Jean (sous la Halle)
-    ["gare saint jean arret de montee","gare saint jean rue saint vincent de paul",59,[4482620,-55691,5,-34,24,-22]], // Gare Saint-Jean (arrêt de Montée) ↔ Gare Saint-Jean (rue Saint-Vincent de Paul)
+    ["gare saint jean arret de montee","gare saint jean rue saint vincent de paul",69,[4482620,-55691,5,-34,24,-22]], // Gare Saint-Jean (arrêt de Montée) ↔ Gare Saint-Jean (rue Saint-Vincent de Paul)
     ["gare saint jean arret de montee","gare saint jean sous la halle",52,[4482620,-55691,5,-34,-22,3]], // Gare Saint-Jean (arrêt de Montée) ↔ Gare Saint-Jean (sous la Halle)
     ["gare saint jean arret de montee","meca",504,[4482620,-55691,8,9,61,23,36,-12,6,12,30,21,35,39,127,105,-54,128]], // Gare Saint-Jean (arrêt de Montée) ↔ MECA
     ["gare saint jean arret de montee","meca paludate",507,[4482620,-55691,8,9,61,23,36,-12,6,12,30,21,35,39,127,105,-55,130]], // Gare Saint-Jean (arrêt de Montée) ↔ MECA (Paludate)
@@ -299,7 +299,7 @@ export default {
     ["gare saint jean sous la halle","meca paludate",559,[4482603,-55722,22,-3,-5,34,8,9,61,23,36,-12,6,12,30,21,35,39,127,105,-55,130]], // Gare Saint-Jean (sous la Halle) ↔ MECA (Paludate)
     ["gare saint jean sous la halle","meca terres de borde",528,[4482603,-55722,22,-3,-5,34,8,9,61,23,36,-12,6,12,30,21,35,39,127,105,-25,54,-34,-4]], // Gare Saint-Jean (sous la Halle) ↔ MECA (Terres de Borde)
     ["gare saint jean","ateliers",491,[4482433,-55771,-31,-20,-5,-15,-13,2,-153,-152,-5,7,-11,-9,-78,115,-55,-30]], // Gare Saint-Jean ↔ Ateliers
-    ["gare saint jean","bauducheu",260,[4482433,-55771,-31,-20,-5,-15,-13,2,-141,-140]], // Gare Saint-Jean ↔ Bauducheu
+    ["gare saint jean","bauducheu",261,[4482433,-55771,-31,-20,-5,-15,-13,2,-141,-140]], // Gare Saint-Jean ↔ Bauducheu
     ["gare saint jean","gare saint jean rue saint vincent de paul",197,[4482728,-55689,-3,18,-36,12,-61,-23,-8,-9,5,-34,24,-22]], // Gare Saint-Jean ↔ Gare Saint-Jean (rue Saint-Vincent de Paul)
     ["gare saint jean","gare saint jean sous la halle",191,[4482728,-55689,-3,18,-39,12,-58,-23,-8,-9,5,-34,-22,3]], // Gare Saint-Jean ↔ Gare Saint-Jean (sous la Halle)
     ["gare saint jean","meca terres de borde",366,[4482728,-55689,-3,18,6,12,192,165,-25,54,-34,-4]], // Gare Saint-Jean ↔ MECA (Terres de Borde)

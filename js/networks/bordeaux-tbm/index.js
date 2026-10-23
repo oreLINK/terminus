@@ -3,6 +3,7 @@
 
 import { loadTimetable, clearTimetableCache } from "./siri-lite.js";
 import { isPublicHoliday } from "../../core/holidays.js";
+import { mergeStops, mergeGraphs, mergeShapes, loadMerged } from "../../core/compose.js";
 
 // Horaires théoriques du soir (tools/build-timetable.mjs), un dossier par mode : un index et un
 // fichier par type de jour, chargés à la demande. `refs` traduit les identifiants GTFS en identifiants SIRI (vérifié le
@@ -18,6 +19,9 @@ const evening = (kind) => ({
   loadDay: (type) => import(`./evening/${kind}/day-${type}.js`).then((m) => m.default),
   refs: gtfsRefs,
 });
+
+// Fichiers générés, chargés à la demande ; un mode qui combine tram et bus les assemble (compose.js).
+const data = (file) => () => import(`./${file}`).then((m) => m.default);
 
 // Ancien cache du réseau (lignes et arrêts lus dans l'API, ~24 h), remplacé par stops.js : on libère la place.
 try {
@@ -111,6 +115,29 @@ export default {
       loadTransfers: () => import("./bus-transfers.js").then((m) => m.default),
       evening: evening("bus"),
       method: "offline",
+      clearCache: clearTimetableCache,
+    },
+
+    // Tram et bus de jour ensemble : trajets, correspondances de l'un à l'autre (dans une même station,
+    // ou à pied entre stations proches, transport-transfers.js) et marche jusqu'aux arrêts. Arrêts,
+    // horaires, tracés et graphe sont ceux des deux modes, assemblés au chargement ; seules les
+    // correspondances à pied tram ↔ bus sont générées en plus (tools/build-transfers.mjs).
+    "last-transport": {
+      vehicle: "transport",
+      lineLabel: "ligne", // « ligne A », « ligne 4 » pour les lecteurs d'écran (et non « transport A »)
+      nightHint: "Pensez aux bus de nuit TBNight les nuits où ils circulent, ou à Le Vélo.",
+      serviceEndHour: 3,
+      serviceStartHour: 18,
+      loadStops: loadMerged(mergeStops, data("stops.js"), data("bus-stops.js")),
+      loadTimetable,
+      loadGraph: loadMerged(mergeGraphs, data("graph.js"), data("bus-graph.js")), // ancienne méthode seulement
+      loadShapes: loadMerged(mergeShapes, data("shapes.js"), data("bus-shapes.js")),
+      loadTransfers: data("transport-transfers.js"),
+      evening: [evening("tram"), evening("bus")],
+      method: "offline",
+      // Plus de lignes autour de soi (68) : plus de candidats, pour garder la station la plus proche de
+      // chaque ligne (la marche réelle n'est demandée que pour celles qu'un trajet emprunte).
+      candidates: { origins: { radius: 2000, min: 2, max: 16 }, dests: { radius: 1500, min: 1, max: 12 } },
       clearCache: clearTimetableCache,
     },
 

@@ -68,7 +68,7 @@ Les bus de jour (`bus-stops.js`, `bus-graph.js`) sont tirés du GTFS, sans appel
 npm run bus
 ```
 
-`js/networks/bordeaux-tbm/transfers.js` , `night-transfers.js` et `bus-transfers.js` contiennent les correspondances à pied entre stations proches de noms différents, avec leur marche par les rues calculée une fois par l'IGN. Relancez-les après `npm run graph` et `npm run bus` (les stations viennent des arrêts) ; la génération est incrémentale, l'IGN n'est appelé que pour les nouvelles paires :
+`js/networks/bordeaux-tbm/transfers.js`, `night-transfers.js`, `bus-transfers.js` et `transport-transfers.js` (tram et bus, avec les correspondances tram ↔ bus) contiennent les correspondances à pied entre stations proches de noms différents, avec leur marche par les rues calculée une fois par l'IGN. Relancez-les après `npm run graph` et `npm run bus` (les stations viennent des arrêts) ; la génération est incrémentale, l'IGN n'est appelé que pour les nouvelles paires :
 
 ```sh
 npm run transfers
@@ -122,7 +122,7 @@ GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossi
 Le site est découpé en trois couches pour accueillir d'autres villes et d'autres informations :
 
 - `js/networks/` : un dossier par réseau de transport (ville, zone, couleurs de lignes, sources, adaptateurs d'API).
-- `js/features/` : un dossier par mode (aujourd'hui trois : « Le dernier tram », `last-ride`, « Le dernier bus », `last-bus`, et « Le prochain bus de nuit », `night-ride`).
+- `js/features/` : un dossier par mode (aujourd'hui quatre : « Le dernier tram », `last-ride`, « Le dernier bus », `last-bus`, « Le dernier transport », `last-transport`, et « Le prochain bus de nuit », `night-ride`).
 - `js/core/` : ce qui est commun (position, destination, stockage, feuilles, champ d'adresse, géocodage).
 
 `js/app.js` choisit la ville et le mode (automatiquement ou via les sélecteurs de l'en-tête) et monte le module correspondant. Les interfaces sont détaillées dans [CONTEXT.md](CONTEXT.md), section 4.
@@ -166,9 +166,11 @@ js/core/season.js                    application du thème de saison actif
 THEMES.md                            calendrier des thèmes et procédure pour en ajouter un
 js/features/last-ride/               « Le dernier tram » : écrans et calcul pur
 js/features/last-bus/                « Le dernier bus » (bus de jour), même écran
+js/features/last-transport/          « Le dernier transport » (tram et bus combinés), même écran
 js/features/night-ride/              « Le prochain bus de nuit » (TBNight), même écran
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
 tests/registry.test.mjs              tests des registres et du stockage de la destination
+tests/compose.test.mjs               tests de l'assemblage des données de plusieurs modes
 tests/transfers.test.mjs             tests des correspondances à pied générées (stations, distances, tracés)
 tests/timetable.test.mjs             tests des horaires inclus (heures GTFS, jours manquants, fusion avec le temps réel)
 tests/walk-route.test.mjs            tests de l'itinéraire piéton (réponse IGN, nouvel essai, temps de marche)
