@@ -116,6 +116,7 @@ Seule Bordeaux Métropole est couverte pour le moment. Chaque nouvelle ville aur
 | | Plusieurs langues | 🟡 | |
 | | Installation sur l'écran d'accueil | 🟡 | |
 | | Donner son avis sur un trajet | 🟡 | |
+| | État du service | 🟡 | |
 
 </details>
 
@@ -146,6 +147,10 @@ Ce qui est prévu, sans date ni ordre garanti. Une fonctionnalité quitte cette 
 - **Partager mon trajet** : un bouton qui ouvre le partage de votre téléphone avec un message prêt à envoyer à un proche, par exemple « Je pars de la place de la Victoire à 23 h 40, j'arrive vers 0 h 10 ». Votre adresse n'y figure pas.
 - **Besoin d'aide** : un accès direct pour appeler le 17 ou le 112, ou écrire au 114 par SMS, et pour partager votre position, avec une sirène et un écran qui clignote pour attirer l'attention. Il ne remplacera pas les services d'urgence.
 - **Me prévenir avant de partir** : une notification quelques minutes avant l'heure limite, même quand Terminus n'est pas à l'écran (après l'avoir installé sur l'écran d'accueil).
+
+**Savoir si tout fonctionne**
+
+- **État du service** : une page, pour la ville choisie, qui dit si les sources dont Terminus a besoin répondent : horaires et temps réel du réseau, recherche d'adresse, calcul de la marche, carte. Pour chacune : **disponible**, **dégradé** (réponses lentes, informations manquantes, temps réel absent) ou **indisponible**, avec l'heure de la dernière vérification et l'historique des dernières 24 heures. Quand Terminus n'arrive pas à joindre une source, il propose d'ouvrir cette page.
 
 **Votre avis**
 
