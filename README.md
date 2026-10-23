@@ -50,6 +50,7 @@ Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'u
 | | Position des véhicules en temps réel | 🟡 | Flux GTFS-RT des véhicules (55 Ko), décodeur protobuf à écrire |
 | **Habillage** | Thèmes de saison imposés par leurs dates (Coco) | 🟢 | Calendrier dans `js/themes/index.js` et `THEMES.md`, vérifiés par un test |
 | | Logo par thème, catalogue de logos (Coco) | 🟢 | `logo` du thème dans `js/themes/index.js` ; 11 logos dans `js/themes/logos.js` (T13 et H09 en service, 9 en réserve), voir `THEMES.md` |
+| | Icônes du site : favicon et écran d'accueil de l'iPhone | 🟢 | F05 « Ticket incliné », la même pour tous les thèmes ; `icons/icon.svg` est la source, `npm run icons` produit le favicon SVG, le PNG 32 px et l'icône 180 px de l'iPhone (Chrome sans interface) |
 | | Apparence claire ou sombre, jetons de design | 🟢 | Jetons dans `:root`, couleur de la barre du navigateur lue dans le CSS |
 | **Architecture** | Plusieurs réseaux et plusieurs modes | 🟢 | Un objet réseau avec un adaptateur par mode, registres testés |
 | | Briques communes sans dépendance à une fonctionnalité | 🟢 | Dates, noms, stations, pictogrammes dans `js/core/` |
@@ -146,7 +147,7 @@ Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJEC
 ### Actions
 
 - `.github/workflows/tests.yml` (**Tests**) : `npm test` à la demande, à chaque push sur `dev` et sur chaque pull request vers `main`.
-- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
+- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `icons/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
 - `.github/workflows/data.yml` (**Données du réseau**) : chaque lundi à 4 h 17 UTC (6 h 17 à Paris l'été, 5 h 17 l'hiver) et à la demande. Crée la branche `data-refresh` depuis `main`, y recharge les arrêts des bus (`npm run bus`), les correspondances à pied (`npm run transfers`), les horaires du soir (`npm run timetable`) et les tracés (`npm run shapes`) depuis le GTFS, lance `npm test`, ouvre une pull request `data-refresh` → `main`, attend que ses vérifications (l'Action « Tests », lancée sur la branche) passent, la fusionne, supprime `data-refresh` et relance la mise en ligne. Une semaine en échec laisse la pull request ouverte ; la suivante la met à jour. Réglage à activer une fois : *Settings → Actions → General → « Allow GitHub Actions to create and approve pull requests »*. Jeton personnel en secret `DATA_PR_TOKEN` facultatif (si la protection de `main` l'exige). Ces fusions arrivent sur `main` sans passer par `dev` : fusionnez `main` dans `dev` (`git merge origin/main`) avant d'ouvrir une pull request `dev` → `main`, en gardant la version de `main` pour les fichiers générés (ou en les régénérant).
 
 La version en ligne est consultable à `https://<utilisateur>.github.io/<repo>/version.json`.
@@ -161,7 +162,7 @@ Ces réglages vivent dans GitHub, pas dans le dépôt : vérifiez-les dans **Set
 
 ## Déploiement GitHub Pages
 
-Le site est servi depuis la branche `gh-pages`, alimentée par l'Action de déploiement à chaque merge dans `main` (voir ci-dessus). `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `css/`, `js/` et `vendor/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
+Le site est servi depuis la branche `gh-pages`, alimentée par l'Action de déploiement à chaque merge dans `main` (voir ci-dessus). `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `css/`, `js/`, `vendor/` et `icons/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
 
 GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossier doit être servi (images, manifeste…), ajoutez-le à l'étape « Assembler le site » de `deploy.yml`.
 
@@ -195,6 +196,8 @@ index.html                           coquille HTML : fond d'ambiance, en-tête, 
 mentions-legales.html                mentions légales
 confidentialite.html                 données personnelles et bouton d'effacement (js/legal.js)
 vendor/leaflet/                      Leaflet 1.9.4 (carte), copié tel quel avec sa licence
+icons/                               icônes : icon.svg (source), favicon.svg, favicon-32.png, apple-touch-icon.png (npm run icons)
+tools/build-icons.mjs                génération des icônes depuis icons/icon.svg, rendues par Chrome (npm run icons)
 css/style.css                        styles et jetons de design
 js/app.js                            choix de la ville et de l'information, montage
 js/core/                             position, destination, stockage, feuilles, adresses, dates, stations, icônes, utilitaires

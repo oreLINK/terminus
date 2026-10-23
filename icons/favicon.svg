@@ -1,0 +1,10 @@
+<!-- Généré par tools/build-icons.mjs (npm run icons) depuis icon.svg. Ne pas modifier à la main. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><clipPath id="r"><rect width="64" height="64" rx="14"/></clipPath><g clip-path="url(#r)">
+  <rect width="64" height="64" fill="#12202E"/>
+  <g transform="rotate(-16 32 32)">
+    <path d="M9 19H55Q58 19 58 22V27.8A4.2 4.2 0 0 0 58 36.2V42Q58 45 55 45H9Q6 45 6 42V36.2A4.2 4.2 0 0 0 6 27.8V22Q6 19 9 19Z" fill="#FFB547"/>
+    <rect x="12" y="29" width="21" height="6" rx="3" fill="#12202E"/>
+    <path d="M40 22.5V41.5" stroke="#12202E" stroke-width="1.6" stroke-dasharray="2.6 2.4" stroke-linecap="round" fill="none"/>
+    <path d="M43.5 32H49.5M52.2 27.4V36.6" stroke="#12202E" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+  </g>
+</g></svg>
