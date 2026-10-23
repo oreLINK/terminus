@@ -10,6 +10,7 @@
     "shapes": "node tools/build-shapes.mjs",
     "timetable": "node tools/build-timetable.mjs",
     "compare": "node tools/compare-methods.mjs",
-    "serve": "python3 tools/serve.py 8000"
+    "serve": "python3 tools/serve.py 8000",
+    "icons": "node tools/build-icons.mjs"
   }
 }

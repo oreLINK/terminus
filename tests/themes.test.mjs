@@ -77,3 +77,15 @@ test("logo : chaque thème en a un du catalogue, et les pages affichent celui du
     assert.ok(src.includes(logoHtml(DEFAULT_THEME.logo)), `${page} : recopier logoHtml("${DEFAULT_THEME.logo}") dans .wordmark`);
   }
 });
+
+test("icônes : fichiers présents, déclarés par chaque page et copiés au déploiement", () => {
+  for (const file of ["icon.svg", "favicon.svg", "favicon-32.png", "apple-touch-icon.png"]) {
+    assert.ok(existsSync(fileURLToPath(new URL(`../icons/${file}`, import.meta.url))), `icons/${file} absent (npm run icons)`);
+  }
+  for (const page of ["index.html", "mentions-legales.html", "confidentialite.html"]) {
+    const src = readFileSync(new URL(`../${page}`, import.meta.url), "utf8");
+    for (const href of ["icons/favicon.svg", "icons/favicon-32.png", "icons/apple-touch-icon.png"]) assert.ok(src.includes(`href="${href}"`), `${page} : ${href}`);
+  }
+  const deploy = readFileSync(new URL("../.github/workflows/deploy.yml", import.meta.url), "utf8");
+  assert.match(deploy, /cp -R [^\n]*\bicons\b/, "deploy.yml copie icons/");
+});

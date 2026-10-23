@@ -33,7 +33,7 @@ jobs:
       - name: Assembler le site
         run: |
           mkdir _site
-          cp -R index.html mentions-legales.html confidentialite.html css js vendor _site/
+          cp -R index.html mentions-legales.html confidentialite.html css js vendor icons _site/
           # Pas de traitement Jekyll : les fichiers sont servis tels quels.
           touch _site/.nojekyll
           # Version publiée, consultable à /version.json.
