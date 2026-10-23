@@ -1,7 +1,7 @@
 // Réseau TBM, Bordeaux Métropole.
 // Décrit la ville et, pour chaque mode qu'il sait fournir, l'adaptateur de données.
 
-import { loadTimetable, clearTimetableCache } from "./siri-lite.js";
+import { loadTimetable, loadStopVisits, clearTimetableCache } from "./siri-lite.js";
 import { isPublicHoliday } from "../../core/holidays.js";
 import { mergeStops, mergeGraphs, mergeShapes, loadMerged } from "../../core/compose.js";
 
@@ -49,7 +49,12 @@ export default {
     department: "33",
     bounds: { south: 44.1, north: 45.6, west: -1.3, east: 0.35 },
     center: { lat: 44.84, lon: -0.58 },
-    addressExample: "12 cours Victor Hugo, Bordeaux",
+    addressExample: "12 cours Victor Hugo, la Cité du Vin, Victoire", // adresse, lieu connu, station
+    // Recherche d'adresse : lieux connus (tools/build-places.mjs) et stations de tous les modes,
+    // proposés avant les adresses de l'IGN, sans appel (js/core/place-search.js). Chargés au premier
+    // mot tapé.
+    places: () => import("./places.js").then((m) => m.default.places),
+    stations: loadMerged(mergeStops, data("stops.js"), data("bus-stops.js"), data("night-stops.js")),
   },
 
   // Couleurs officielles des lignes : GTFS TBM, routes.txt (route_color), relevées le 27/09/2026.
@@ -85,6 +90,9 @@ export default {
       // Lignes et arrêts de tram, générés par tools/build-graph.mjs : aucun appel à l'API.
       loadStops: () => import("./stops.js").then((m) => m.default), // → { lines: { [ref]: { ref, code } }, stops: [{ ref, name, lat, lon, lines }] }
       loadTimetable, // (lineRef, direction, { until, maxAge }) → [{ id, line, headsign, calls: [...] }]
+      // Temps réel d'un quai pour une ligne (nouvelle méthode) : (stopRef, lineRef, { until, maxAge }) →
+      // [{ id, line, direction, ref, aimedDep, dep, depLive, aimedArr, arr, arrLive }].
+      loadStopVisits,
       // Ordre des arrêts par ligne et par sens, généré par tools/build-graph.mjs, chargé à la demande.
       loadGraph: () => import("./graph.js").then((m) => m.default), // → { names, patterns: [{ line, direction, stops }] }
       // Tracé réel des lignes (GTFS, tools/build-shapes.mjs), pour la carte ; chargé avec elle.
@@ -110,6 +118,7 @@ export default {
       serviceStartHour: 18,
       loadStops: () => import("./bus-stops.js").then((m) => m.default), // lignes avec leur couleur
       loadTimetable,
+      loadStopVisits,
       loadGraph: () => import("./bus-graph.js").then((m) => m.default), // pour l'ancienne méthode seulement
       loadShapes: () => import("./bus-shapes.js").then((m) => m.default),
       loadTransfers: () => import("./bus-transfers.js").then((m) => m.default),
@@ -130,6 +139,7 @@ export default {
       serviceStartHour: 18,
       loadStops: loadMerged(mergeStops, data("stops.js"), data("bus-stops.js")),
       loadTimetable,
+      loadStopVisits,
       loadGraph: loadMerged(mergeGraphs, data("graph.js"), data("bus-graph.js")), // ancienne méthode seulement
       loadShapes: loadMerged(mergeShapes, data("shapes.js"), data("bus-shapes.js")),
       loadTransfers: data("transport-transfers.js"),
@@ -181,6 +191,7 @@ export default {
       // Lignes, arrêts et graphe TBNight, générés par tools/build-graph.mjs --night.
       loadStops: () => import("./night-stops.js").then((m) => m.default),
       loadTimetable,
+      loadStopVisits,
       loadGraph: () => import("./night-graph.js").then((m) => m.default),
       loadShapes: () => import("./shapes.js").then((m) => m.default), // N1 à N8, dans le même fichier
       evening: evening("night"),

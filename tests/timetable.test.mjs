@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { buildJourneys, eveningJourneys, mergeLive } from "../js/core/timetable.js";
+import { buildJourneys, eveningJourneys, mergeLive, mergeStopLive } from "../js/core/timetable.js";
+import { parseStopVisits } from "../js/networks/bordeaux-tbm/siri-lite.js";
 import { isoDate } from "../js/core/dates.js";
 import tbm from "../js/networks/bordeaux-tbm/index.js";
 import index from "../js/networks/bordeaux-tbm/evening/tram/index.js";
@@ -85,4 +86,79 @@ test("horaires générés : chaque jour a son fichier, et les quais du tram sont
   const unknown = new Set(journeys.flatMap((j) => j.calls.map((c) => c.ref)).filter((r) => !known.has(r)));
   assert.ok(unknown.size === 0, `quais inconnus de stops.js : ${[...unknown].slice(0, 5).join(", ")}`);
   assert.equal(isoDate({ year: 2026, month: 3, day: 7 }), "2026-03-07");
+});
+
+// ---------- Temps réel quai par quai (stop-monitoring) ----------
+
+const Q = (n) => `bordeaux:StopPoint:BP:${n}:LOC`;
+const T0 = Date.parse("2026-10-23T21:00:00Z");
+const course = (id, start) => ({
+  id, line: "bordeaux:Line:59:LOC", direction: "0", headsign: "Est", theoretical: true,
+  calls: [1, 2, 3, 4].map((n, k) => ({ ref: Q(n), name: String(n), dep: start + k * 300000, depLive: false, arr: start + k * 300000, arrLive: false, cancelled: false })),
+});
+const visit = (id, n, aimed, expected) => ({ id, line: "bordeaux:Line:59:LOC", direction: "0", ref: Q(n), aimedDep: aimed, dep: expected, depLive: true, aimedArr: aimed, arr: expected, arrLive: true });
+
+test("stop-monitoring : lecture du format Mecatran, identifiant complété de « :LOC »", () => {
+  const json = { Siri: { ServiceDelivery: { StopMonitoringDelivery: [{ MonitoredStopVisit: [
+    { MonitoredVehicleJourney: { LineRef: { value: "bordeaux:Line:59:LOC" }, DirectionRef: { value: "0" }, FramedVehicleJourneyRef: { DatedVehicleJourneyRef: "bordeaux:ServiceJourney:t_1_23" },
+      MonitoredCall: { StopPointName: [{ value: "Hôtel de Ville" }], Order: 12, AimedArrivalTime: "2026-10-23T21:00:00Z", AimedDepartureTime: "2026-10-23T21:00:30Z", ExpectedDepartureTime: "2026-10-23T21:02:30Z" } } },
+    { MonitoredVehicleJourney: { LineRef: { value: "bordeaux:Line:59:LOC" }, DirectionRef: { value: "0" }, FramedVehicleJourneyRef: { DatedVehicleJourneyRef: "bordeaux:ServiceJourney:t_2_23" },
+      MonitoredCall: { AimedDepartureTime: "2026-10-23T21:10:00Z" } } },
+  ] }] } } };
+  const [a, b] = parseStopVisits(json);
+  assert.equal(a.doubtful, false);
+  assert.equal(a.id, "bordeaux:ServiceJourney:t_1_23:LOC");
+  assert.equal(a.direction, "0");
+  assert.equal(a.aimedDep, Date.parse("2026-10-23T21:00:30Z"));
+  assert.equal(a.dep, Date.parse("2026-10-23T21:02:30Z"));
+  assert.ok(a.depLive);
+  assert.equal(a.arrLive, false); // pas d'heure d'arrivée en temps réel : l'heure prévue
+  assert.equal(b.dep, b.aimedDep);
+  assert.equal(b.depLive, false);
+});
+
+test("mergeStopLive : l'heure du quai, et le retard reporté sur les arrêts suivants", () => {
+  const { journeys, seen } = mergeStopLive([course("c1", T0), course("c2", T0 + 900000)], [visit("c1", 2, T0 + 300000, T0 + 420000)]);
+  const [c1, c2] = journeys;
+  assert.equal(c1.calls[0].dep, T0); // avant le quai : inchangé
+  assert.equal(c1.calls[1].dep, T0 + 420000);
+  assert.ok(c1.calls[1].depLive);
+  assert.equal(c1.calls[3].arr, T0 + 900000 + 120000); // 2 min de retard reportées
+  assert.equal(c1.calls[3].arrLive, false);
+  assert.equal(c2.calls[1].dep, T0 + 1200000); // l'autre course reste théorique
+  assert.ok(seen.has(`c1|${Q(2)}`));
+});
+
+test("mergeStopLive : un passage plus loin corrige le report, et rien n'est retiré", () => {
+  const visits = [visit("c1", 3, T0 + 600000, T0 + 600000 + 60000), visit("c1", 2, T0 + 300000, T0 + 300000 + 180000)];
+  const { journeys } = mergeStopLive([course("c1", T0)], visits);
+  const calls = journeys[0].calls;
+  assert.equal(calls[1].dep, T0 + 480000);
+  assert.equal(calls[2].dep, T0 + 660000); // 1 min, et non 3 : le passage du quai 3 l'emporte
+  assert.equal(calls[3].dep, T0 + 960000);
+  const none = mergeStopLive([course("c1", T0)], []);
+  assert.equal(none.journeys.length, 1);
+  assert.equal(none.seen.size, 0);
+});
+
+test("mergeStopLive : même identifiant un autre jour, ou quai non desservi : ignoré", () => {
+  const original = course("c1", T0);
+  const { journeys, seen } = mergeStopLive([original], [visit("c1", 2, T0 + 300000 + 24 * 3600000, T0 + 24 * 3600000), visit("c1", 9, T0, T0)]);
+  assert.deepEqual(journeys[0], original);
+  assert.equal(seen.size, 0);
+});
+
+test("stop-monitoring : une course peut-être annulée (gardée comme un passage, sans temps réel) est douteuse", () => {
+  const json = { Siri: { ServiceDelivery: { StopMonitoringDelivery: [{ MonitoredStopVisit: [
+    { RecordedAtTime: "2026-10-23T18:28:42Z", MonitoredVehicleJourney: { LineRef: { value: "bordeaux:Line:59:LOC" }, DirectionRef: { value: "1" }, FramedVehicleJourneyRef: { DatedVehicleJourneyRef: "bordeaux:ServiceJourney:t_268436230_23" },
+      MonitoredCall: { Order: 0, AimedDepartureTime: "2026-10-23T19:56:58Z" } } },
+  ] }] } } };
+  assert.equal(parseStopVisits(json)[0].doubtful, true);
+});
+
+test("mergeStopLive : un passage douteux n'est ni appliqué ni compté (sa course sera vérifiée)", () => {
+  const original = course("c1", T0);
+  const { journeys, seen } = mergeStopLive([original], [{ ...visit("c1", 2, T0 + 300000, T0 + 420000), doubtful: true }]);
+  assert.deepEqual(journeys[0], original);
+  assert.equal(seen.size, 0);
 });

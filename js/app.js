@@ -163,3 +163,12 @@ if (lab) {
 // Thème de saison d'abord : la première image a déjà ses couleurs.
 startSeason();
 mount();
+
+// Fichiers du site gardés sur le téléphone pour les visites suivantes (sw.js), une fois la page
+// affichée. Pas sur le poste de développement, où le code change sans cesse (npm run serve).
+const LOCAL_HOSTS = ["localhost", "127.0.0.1"];
+if ("serviceWorker" in navigator && !LOCAL_HOSTS.includes(globalThis.location.hostname)) {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(() => {});
+  });
+}

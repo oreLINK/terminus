@@ -94,3 +94,49 @@ export function mergeLive(journeys, requests, live) {
   }
   return [...out.filter(Boolean), ...added];
 }
+
+// Rémi, arrêt par arrêt — applique aux courses les passages lus à quelques quais (stop-monitoring :
+// la montée et la descente de chaque tronçon du trajet affiché). Un passage s'applique à la course
+// de même identifiant qui dessert ce quai à moins de 30 min de l'heure prévue du flux (un même
+// identifiant peut revenir d'un jour à l'autre). Le quai prend l'heure du flux ; l'écart (retard ou
+// avance) est reporté sur les arrêts suivants de la course, sans les dire « en temps réel » : un
+// passage plus loin, s'il est demandé, le corrige. Rien n'est retiré : une course sans passage reste
+// théorique (le flux ne signale pas les annulations ; l'appelant vérifie autrement les absentes).
+// Un passage « douteux » (`doubtful` : peut-être une course annulée, que le flux garde comme un
+// passage ordinaire) n'est ni appliqué ni compté : sa course est vérifiée comme une absente.
+// Renvoie { journeys, seen } ; `seen` : les « id|quai » trouvés dans le flux et sûrs.
+export function mergeStopLive(journeys, visits) {
+  const NEAR_MS = 30 * 60 * 1000;
+  const byId = new Map();
+  journeys.forEach((j, i) => byId.set(j.id, [...(byId.get(j.id) ?? []), i]));
+  const matches = [];
+  const seen = new Set();
+  for (const v of visits) {
+    if (v.doubtful) continue;
+    for (const i of byId.get(v.id) ?? []) {
+      const k = journeys[i].calls.findIndex((c) => c.ref === v.ref && Math.abs(c.dep - v.aimedDep) < NEAR_MS);
+      if (k < 0) continue;
+      matches.push({ i, k, v });
+      seen.add(`${v.id}|${v.ref}`);
+      break;
+    }
+  }
+  // Par course, dans l'ordre des arrêts : un passage plus loin corrige le report du précédent.
+  matches.sort((a, b) => a.i - b.i || a.k - b.k);
+  const out = [...journeys];
+  const copied = new Set();
+  for (const { i, k, v } of matches) {
+    if (!copied.has(i)) {
+      out[i] = { ...out[i], calls: out[i].calls.map((c) => ({ ...c })) };
+      copied.add(i);
+    }
+    const calls = out[i].calls;
+    const shift = v.dep - calls[k].dep;
+    for (let n = k + 1; n < calls.length; n++) {
+      calls[n].dep += shift;
+      calls[n].arr += shift;
+    }
+    calls[k] = { ...calls[k], dep: v.dep, depLive: v.depLive, arr: v.arr, arrLive: v.arrLive };
+  }
+  return { journeys: out, seen };
+}

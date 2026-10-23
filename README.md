@@ -27,11 +27,15 @@ Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'u
 | | Nouvelle méthode : horaires du soir inclus (Léa) + temps réel ciblé (Rémi, Sam) | 🟢 | Tram (depuis le 23/10/2026), bus et transport ; TBNight encore sur l'ancienne méthode, en attente d'une comparaison une nuit de service |
 | | Ancienne méthode : horaires SIRI par ligne, par paliers | 🟢 | Gardée en secours (données manquantes ou périmées) jusqu'à la fin des tests de fiabilité |
 | | Modes combinés par assemblage des données (Colette) | 🟢 | « Le dernier transport » : arrêts, graphes, tracés et horaires du tram et du bus, sans fichier en double |
+| | Courses terminées écartées avant le calcul | 🟢 | Résultat identique au calcul complet (900 trajets vérifiés le 23/10/2026 sur trois modes et cinq heures) ; « Le dernier transport » : 74 ms → 47 ms à 19 h, 16 ms à 21 h 30, 10 ms à 23 h 30 sur ordinateur. Calcul complet refait seulement quand il ne reste aucun trajet (statut « over ») |
+| | Calcul en ordre « Connection Scan » (prototype Bob 2) | 🔴 | Essayé le 23/10/2026 : mêmes résultats sur 1 500 trajets, mais 10 à 60 % **plus lent** en JavaScript avec le modèle d'objets actuel (accès dispersés d'une course à l'autre, tri initial) ; un gain demanderait des données en tableaux typés de bout en bout. Écarté |
 | | Profils gardés d'un recalcul à l'autre | 🟡 | Jusqu'à 3 calculs par actualisation, environ 0,3 s sur téléphone en mode transport |
-| **Appels réseau** | Temps réel limité aux lignes du trajet affiché | 🟢 | 1 à 3 appels SIRI par calcul (nouvelle méthode), cache mémoire et `sessionStorage` |
+| **Appels réseau** | Temps réel limité au trajet affiché, quai par quai | 🟢 | `stop-monitoring` à la montée et à la descente de chaque tronçon (Sam, `loadStopVisits` ; Rémi, `mergeStopLive`) : environ 100 Ko par calcul au lieu de 1,3 à 1,6 Mo par ligne entière (−92 à −94 %, mesuré le 23/10/2026), mêmes trajets ; ligne entière seulement pour vérifier une course absente ou marquée douteuse (les annulées restent listées par `stop-monitoring` : toutes retirées par cette vérification, 16 sur 16 le 23/10/2026 au soir) |
+| | Connexions ouvertes d'avance | 🟢 | `preconnect` vers TBM et l'IGN dans `index.html` : environ 150 à 250 ms gagnées en 4G au premier appel |
+| | Marches côté destination gardées d'une visite à l'autre (Max, mémoire) | 🟢 | `js/core/walk-memory.js`, clé `dt.walks.v1` : environ 2,4 appels à l'IGN de moins par visite, sur environ 8 ; 30 jours, remplacées si la destination change |
 | | Marche réelle par les rues (Max) | 🟢 | IGN, 2 appels à la fois, espacés, un nouvel essai sur refus ; seulement pour les stations empruntées |
 | | Données du réseau incluses dans le site | 🟢 | Arrêts, graphes, tracés, correspondances, horaires : aucun appel pour les charger, un fichier par mode, chargé à la demande |
-| | Mise en cache hors ligne (service worker) | 🟡 | 2ᵉ visite instantanée ; préalable à l'installation sur l'écran d'accueil |
+| | Fichiers du site gardés sur le téléphone (service worker) | 🟢 | `sw.js` : pages, modules, styles, icônes, Leaflet et données générées servis sans réseau dès la 2ᵉ visite (GitHub Pages ne les garde que 10 min) ; tous oubliés à chaque nouvelle version publiée (`version.json`) ; page au réseau d'abord, copie gardée hors connexion. Services (TBM, IGN) jamais mis en cache ; fond de carte gardé 21 jours par le navigateur lui-même. Préalable à l'installation sur l'écran d'accueil |
 | | Flux GTFS-RT des retards de tout le réseau | 🔴 | 2,7 Mo : trop lourd toutes les 30 s sur un téléphone |
 | **Données** | Générateurs depuis le GTFS de TBM (Gus) | 🟢 | Arrêts et graphe des bus, horaires du soir sur 21 jours, tracés des lignes |
 | | Correspondances à pied incrémentales | 🟢 | Cache commun par paire de quais, sens du tracé conservé ; l'IGN n'est appelé que pour les nouvelles paires |
@@ -39,6 +43,7 @@ Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'u
 | | Arrêts et graphes du tram et de TBNight tirés du GTFS | 🟡 | Aujourd'hui générés depuis SIRI (`npm run graph`) ; rendrait `build-graph.mjs` inutile |
 | | Identifiants courts dans les fichiers générés | 🟡 | Environ 30 à 40 % de moins sur les arrêts et les graphes |
 | | Alerte de données périmées | 🟡 | Échec de l'Action si le GTFS expire bientôt ; signal dans le labo |
+| **Recherche** | Lieux connus et stations dans la recherche d'adresse (Inès) | 🟢 | Sans appel : catalogue généré (`npm run places`, 52 lieux placés par le géocodage des points d'intérêt de l'IGN, noms et catégories vérifiés, quelques adresses postales marquées « à vérifier ») et arrêts de tous les modes ; recherche sans accents sur le début des mots, alias, 0,2 à 0,8 ms (`js/core/place-search.js`) ; adresses de l'IGN ensuite |
 | **Avis** | Avis sur un trajet : Supabase, Edge Function et Turnstile | 🟡 | Un seul appel, à l'envoi ; table fermée au public (RLS), insertion par une Edge Function qui vérifie le jeton Turnstile et limite par IP hachée, clé `service_role` dans les secrets de la fonction ; script Turnstile chargé à l'ouverture de la feuille d'avis seulement |
 | | Rapport d'analyse anonyme, sur consentement | 🟡 | Case décochée par défaut, contenu montré avant l'envoi ; jamais d'adresse, de coordonnées ni d'identifiant |
 | **État du service** | Page d'état par ville : sources disponibles, dégradées ou indisponibles | 🟡 | Sources déclarées par le réseau ; vérifiées côté serveur toutes les 10 min (Edge Function Supabase lancée par `pg_cron`, proposition), la page ne fait qu'un appel en lecture ; historique 24 h |
@@ -152,7 +157,7 @@ Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJEC
 ### Actions
 
 - `.github/workflows/tests.yml` (**Tests**) : `npm test` à la demande, à chaque push sur `dev` et sur chaque pull request vers `main`.
-- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `icons/` et `version.json` avec le commit et la date), l'envoie comme artefact (`actions/upload-pages-artifact`), puis le publie (`actions/deploy-pages`) dans l'environnement `github-pages`, qui n'accepte que `main`. Droits : lecture seule pour l'assemblage, `pages: write` et `id-token: write` pour la publication ; aucun droit d'écriture sur le dépôt. L'historique des déploiements est dans *Deployments*. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
+- `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `sw.js`, `css/`, `js/`, `vendor/`, `icons/` et `version.json` avec le commit et la date), l'envoie comme artefact (`actions/upload-pages-artifact`), puis le publie (`actions/deploy-pages`) dans l'environnement `github-pages`, qui n'accepte que `main`. Droits : lecture seule pour l'assemblage, `pages: write` et `id-token: write` pour la publication ; aucun droit d'écriture sur le dépôt. L'historique des déploiements est dans *Deployments*. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
 - `.github/dependabot.yml` : chaque lundi, une pull request vers `dev` qui met à jour les Actions des workflows. Elles sont **épinglées par empreinte de commit** (`actions/checkout@<sha> # v7.0.1`), pour qu'un tag déplacé ne puisse pas changer le code exécuté ; Dependabot met à jour l'empreinte et le commentaire.
 - `.github/workflows/data.yml` (**Données du réseau**) : chaque lundi à 4 h 17 UTC (6 h 17 à Paris l'été, 5 h 17 l'hiver) et à la demande. Crée la branche `data-refresh` depuis `main`, y recharge les arrêts des bus (`npm run bus`), les correspondances à pied (`npm run transfers`), les horaires du soir (`npm run timetable`) et les tracés (`npm run shapes`) depuis le GTFS, lance `npm test`, ouvre une pull request `data-refresh` → `main`, attend que ses vérifications (l'Action « Tests ») passent, la fusionne, supprime `data-refresh`, et la fusion lance la mise en ligne. Une semaine en échec laisse la pull request ouverte ; la suivante la met à jour. Jeton requis dès que `main` exige une approbation : secret `DATA_PR_TOKEN` (voir « Réglages GitHub », étape 4) ; l'Action agit alors au nom du propriétaire et fusionne avec son exception (`--admin`), toujours après les vérifications. Sans ce jeton, elle utilise `GITHUB_TOKEN` et a besoin de *« Allow GitHub Actions to create and approve pull requests »*. Ces fusions arrivent sur `main` sans passer par `dev` : fusionnez `main` dans `dev` (`git merge origin/main`) avant d'ouvrir une pull request `dev` → `main`, en gardant la version de `main` pour les fichiers générés (ou en les régénérant).
 
@@ -177,7 +182,7 @@ Ces réglages vivent dans GitHub, pas dans le dépôt : vérifiez-les dans **Set
 
 ## Déploiement GitHub Pages
 
-Le site est publié par l'Action de déploiement à chaque merge dans `main`, en mode GitHub Pages « GitHub Actions » (voir ci-dessus) ; il n'y a pas de branche `gh-pages`. `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `css/`, `js/`, `vendor/` et `icons/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
+Le site est publié par l'Action de déploiement à chaque merge dans `main`, en mode GitHub Pages « GitHub Actions » (voir ci-dessus) ; il n'y a pas de branche `gh-pages`. `index.html` doit rester à la racine du dépôt, car l'Action copie `index.html`, les pages légales, `sw.js`, `css/`, `js/`, `vendor/` et `icons/` tels quels. L'URL prend la forme `https://<utilisateur>.github.io/<repo>/`.
 
 GitHub Pages fournit HTTPS, requis pour la géolocalisation. Si un nouveau dossier doit être servi (images, manifeste…), ajoutez-le à l'étape « Assembler le site » de `deploy.yml`.
 
@@ -212,7 +217,9 @@ mentions-legales.html                mentions légales
 confidentialite.html                 données personnelles et bouton d'effacement (js/legal.js)
 vendor/leaflet/                      Leaflet 1.9.4 (carte), copié tel quel avec sa licence
 icons/                               icônes : icon.svg (source), favicon.svg, favicon-32.png, apple-touch-icon.png (npm run icons)
+sw.js                                service worker : fichiers du site gardés sur le téléphone, renouvelés à chaque version
 tools/build-icons.mjs                génération des icônes depuis icons/icon.svg, rendues par Chrome (npm run icons)
+tools/build-places.mjs               génération du catalogue des lieux connus, places.js, géocodé par l'IGN (npm run places)
 css/style.css                        styles et jetons de design
 js/app.js                            choix de la ville et de l'information, montage
 js/core/                             position, destination, stockage, feuilles, adresses, dates, stations, icônes, utilitaires
@@ -230,6 +237,7 @@ js/features/index.js                 registre des modes
 js/themes/                           thèmes de saison (calendrier dans index.js, un dossier par thème)
 js/core/season.js                    application du thème de saison actif
 THEMES.md                            calendrier des thèmes et procédure pour en ajouter un
+DESIGN.md                            fiche de design (jetons, verre, composants, mouvement, thème Halloween), pour reproduire le design ailleurs
 js/features/last-ride/               « Le dernier tram » : écrans et calcul pur
 js/features/last-bus/                « Le dernier bus » (bus de jour), même écran
 js/features/last-transport/          « Le dernier transport » (tram et bus combinés), même écran
@@ -243,6 +251,9 @@ tests/compose.test.mjs               tests de l'assemblage des données de plusi
 tests/transfers.test.mjs             tests des correspondances à pied générées (stations, distances, tracés)
 tests/timetable.test.mjs             tests des horaires inclus (heures GTFS, jours manquants, fusion avec le temps réel)
 tests/walk-route.test.mjs            tests de l'itinéraire piéton (réponse IGN, nouvel essai, temps de marche)
+tests/walk-memory.test.mjs           tests de la mémoire des marches (reprise, destination changée, expiration)
+tests/sw.test.mjs                    tests du service worker, navigateur simulé (visites, nouvelle version, hors connexion)
+tests/place-search.test.mjs          tests de la recherche de lieux et de stations (accents, classement, catalogue de Bordeaux)
 tests/line-trace.test.mjs            tests des tracés de lignes (encodage, découpage, couverture TBM)
 tests/themes.test.mjs                tests du calendrier des thèmes (dates, fichiers, accord avec THEMES.md)
 ```
