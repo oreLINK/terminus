@@ -2,18 +2,15 @@
 // bus de nuit TBNight (N1 à N8), tiré du GTFS statique de TBM (shapes.txt), pour que la carte suive
 // les voies et les rues au lieu de relier les arrêts en ligne droite (voir js/core/line-trace.js).
 // Usage : npm run shapes. Relancer quand une ligne change de parcours ; relire le diff.
-// Le GTFS (environ 22 Mo) est téléchargé puis lu avec la commande unzip du système.
+// Le GTFS est téléchargé et lu par tools/gtfs.mjs.
 
-import { spawnSync } from "node:child_process";
-import { writeFile, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { withGtfs } from "./gtfs.mjs";
 import tramStops from "../js/networks/bordeaux-tbm/stops.js";
 import nightStops from "../js/networks/bordeaux-tbm/night-stops.js";
 import { simplifyLine, encodeLine, distanceToLine } from "../js/core/line-trace.js";
 
-const GTFS = "https://bdx.mecatran.com/utw/ws/gtfsfeed/static/bordeaux?apiKey=opendata-bordeaux-metropole-flux-gtfs-rt";
 const OUT = new URL("../js/networks/bordeaux-tbm/shapes.js", import.meta.url);
 const TOLERANCE_M = 4; // écart maximal entre le tracé simplifié et le tracé d'origine
 const CONTAINED_M = 8; // un tracé dont chaque point est à moins de 8 m d'un autre est un doublon
@@ -21,49 +18,7 @@ const CONTAINED_M = 8; // un tracé dont chaque point est à moins de 8 m d'un a
 // Les lignes que Terminus calcule : celles des arrêts générés par build-graph.
 const codes = new Set([...Object.values(tramStops.lines), ...Object.values(nightStops.lines)].map((l) => l.code));
 
-// Lecture CSV simple, guillemets compris (les noms de lignes peuvent contenir des virgules).
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quoted) {
-      if (c === '"' && text[i + 1] === '"') {
-        field += '"';
-        i++;
-      } else if (c === '"') quoted = false;
-      else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") {
-      row.push(field);
-      field = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(field);
-      if (row.length > 1 || row[0] !== "") rows.push(row);
-      row = [];
-      field = "";
-    } else field += c;
-  }
-  if (field || row.length) rows.push([...row, field]);
-  const [head, ...body] = rows;
-  const keys = head.map((h) => h.replace(/^﻿/, "").trim());
-  return body.map((r) => Object.fromEntries(keys.map((k, i) => [k, r[i] ?? ""])));
-}
-
-const dir = await mkdtemp(join(tmpdir(), "terminus-gtfs-"));
-try {
-  const zip = join(dir, "gtfs.zip");
-  const res = await fetch(GTFS);
-  if (!res.ok) throw new Error(`GTFS indisponible : HTTP ${res.status}`);
-  await writeFile(zip, Buffer.from(await res.arrayBuffer()));
-  const read = (name) => {
-    const out = spawnSync("unzip", ["-p", zip, name], { encoding: "utf8", maxBuffer: 128 * 1024 * 1024 });
-    if (out.status !== 0) throw new Error(`Lecture de ${name} impossible : ${out.stderr || out.error}`);
-    return parseCsv(out.stdout);
-  };
+await withGtfs(async ({ read }) => {
 
   const routeCode = new Map(read("routes.txt").filter((r) => codes.has(r.route_short_name)).map((r) => [r.route_id, r.route_short_name]));
   const shapeCode = new Map();
@@ -121,6 +76,4 @@ ${Object.entries(lines)
 `;
   await writeFile(OUT, body);
   console.log(`${kept} tracés pour ${Object.keys(lines).length} lignes → ${fileURLToPath(OUT)}`);
-} finally {
-  await rm(dir, { recursive: true, force: true });
-}
+});

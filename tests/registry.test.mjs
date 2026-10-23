@@ -35,6 +35,11 @@ test("chaque réseau est complet et ne déclare que des modes connus", () => {
     for (const id of Object.keys(n.features)) assert.ok(known.has(id), `${n.id} : type inconnu ${id}`);
     // Le mode par défaut de la ville est l'un de ceux qu'elle fournit.
     if (n.defaultFeature) assert.ok(n.features[n.defaultFeature], `${n.id} : mode par défaut ${n.defaultFeature} absent`);
+    // Méthode de calcul : « siri » ou « offline », et pas de nouvelle méthode sans horaires inclus.
+    for (const [id, f] of Object.entries(n.features)) {
+      assert.ok([undefined, "siri", "offline"].includes(f.method), `${n.id} ${id} : méthode ${f.method}`);
+      if (f.method === "offline") assert.ok(f.evening?.loadIndex && f.evening?.refs, `${n.id} ${id} : horaires inclus manquants`);
+    }
   }
 });
 

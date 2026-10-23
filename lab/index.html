@@ -181,6 +181,18 @@
           <p class="hint">Une destination doit être enregistrée sur le site : sans elle, c'est l'écran « Ajoutez votre destination » qui s'affiche.</p>
         </fieldset>
 
+        <fieldset>
+          <legend>Méthode de calcul</legend>
+          <label>Comment l'itinéraire est calculé
+            <select name="method">
+              <option value="">Celle du réseau (réglage du site)</option>
+              <option value="siri">Ancienne : horaires SIRI par ligne</option>
+              <option value="offline">Nouvelle : horaires théoriques inclus, temps réel ciblé</option>
+            </select>
+          </label>
+          <p class="hint">La nouvelle méthode calcule sur les horaires du soir générés depuis le GTFS (npm run timetable), puis n'appelle le temps réel que pour les lignes du trajet affiché. Sans horaires pour la soirée, l'ancienne reprend la main.</p>
+        </fieldset>
+
         <div class="actions">
           <button type="submit" class="primary">Appliquer et ouvrir le site</button>
           <button type="button" class="secondary" id="reset">Tout réinitialiser</button>
@@ -206,7 +218,7 @@
     } else if (lab) {
       // L'heure simulée a avancé depuis son réglage : on la montre telle qu'elle est maintenant.
       if (lab.clock != null) field("clock").value = toInput(lab.clock + (Date.now() - lab.setAt));
-      for (const name of ["startHour", "endHour", "liveMin", "countdownMin", "screen"]) {
+      for (const name of ["startHour", "endHour", "liveMin", "countdownMin", "screen", "method"]) {
         if (lab[name] != null) field(name).value = lab[name];
       }
     }
@@ -240,6 +252,7 @@
         liveMin: number("liveMin"),
         countdownMin: number("countdownMin"),
         screen: field("screen").value || undefined,
+        method: field("method").value || undefined,
       };
       if (Object.values(settings).every((v) => v === undefined)) clearLab();
       else saveLab(settings);

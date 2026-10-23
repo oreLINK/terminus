@@ -1,0 +1,116 @@
+# Chaque semaine (et à la demande) : recharge les données tirées du GTFS de TBM (horaires du soir,
+# tracés des lignes) sur une branche data-refresh créée depuis main, ouvre une pull request vers main,
+# attend que ses vérifications (l'Action « Tests ») passent, la fusionne, puis supprime la branche.
+# Les horaires couvrent 21 jours : une semaine manquée ne casse rien, et sans données pour la soirée le
+# site revient de lui-même à l'ancienne méthode (CONTEXT.md, section 11, piste 10). Une semaine en échec
+# laisse la pull request ouverte ; la suivante met à jour la même branche et la même pull request.
+# Le graphe des lignes (npm run graph) reste manuel : il dépend du flux SIRI, en journée et hors travaux.
+#
+# Réglage à activer une fois : Settings > Actions > General > « Allow GitHub Actions to create and
+# approve pull requests ».
+# Une Action qui pousse avec GITHUB_TOKEN ne déclenche pas les autres : celle-ci lance donc « Tests » à
+# la main sur data-refresh (son résultat s'affiche sur la pull request), puis relance la mise en ligne
+# après la fusion. Avec un jeton personnel en secret DATA_PR_TOKEN (utile si la règle de protection de
+# main l'exige), la pull request lance « Tests » et la fusion lance la mise en ligne d'elles-mêmes.
+name: Données du réseau
+
+on:
+  schedule:
+    - cron: "17 4 * * 1" # lundi, 4 h 17 UTC (6 h 17 à Paris l'été, 5 h 17 l'hiver)
+  workflow_dispatch:
+
+permissions:
+  contents: write # pousser la branche des données
+  pull-requests: write # ouvrir et fusionner la pull request
+  actions: write # lancer « Tests » sur data-refresh, relancer la mise en ligne
+  checks: read # suivre les vérifications de la pull request
+
+concurrency:
+  group: donnees-reseau
+  cancel-in-progress: false
+
+jobs:
+  data:
+    name: Recharger les données
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.DATA_PR_TOKEN || github.token }}
+      WITH_PAT: ${{ secrets.DATA_PR_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.DATA_PR_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Horaires du soir
+        run: npm run timetable
+
+      - name: Tracés des lignes
+        run: |
+          npm run shapes
+          # Seule la date de génération a changé : rien à publier pour les tracés.
+          if git diff --quiet -I '^  generatedAt:' -- js/networks/bordeaux-tbm/shapes.js; then
+            git checkout -- js/networks/bordeaux-tbm/shapes.js
+          fi
+
+      - name: Tests avant la pull request
+        # Une donnée incohérente est arrêtée ici, sans ouvrir de pull request.
+        run: npm test
+
+      - name: Branche data-refresh et pull request vers main
+        id: pr
+        run: |
+          if [ -z "$(git status --porcelain -- js/networks/bordeaux-tbm)" ]; then
+            echo "Aucune donnée nouvelle."
+            exit 0
+          fi
+          day="$(TZ=Europe/Paris date +%Y-%m-%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C data-refresh
+          git add js/networks/bordeaux-tbm
+          git commit -q -m "chore(donnees): horaires du soir et tracés au ${day}" -m "Rechargés depuis le GTFS de TBM par l'Action « Données du réseau »."
+          git push -q --force origin data-refresh
+          range="$(sed -n 's/^  firstDay: "\(.*\)",$/\1/p' js/networks/bordeaux-tbm/evening/index.js) → $(sed -n 's/^  lastDay: "\(.*\)",$/\1/p' js/networks/bordeaux-tbm/evening/index.js)"
+          body="$(printf '%s\n' \
+            '## Contexte' '' \
+            "Rechargement hebdomadaire des données tirées du GTFS de TBM, au ${day} (Action « Données du réseau »)." '' \
+            '## Changements' '' \
+            "- Horaires du soir : ${range}" \
+            '- Tracés des lignes, s'"'"'ils ont changé' '' \
+            '## Validation' '' \
+            '- `npm test` passé dans l'"'"'Action, puis l'"'"'Action « Tests » sur cette pull request' '' \
+            '## Impact' '' \
+            '- Données seulement : la nouvelle méthode de calcul garde des horaires pour les trois semaines à venir.')"
+          url="$(gh pr list --head data-refresh --base main --state open --json url --jq '.[0].url')"
+          if [ -n "$url" ]; then
+            gh pr edit "$url" --body "$body"
+          else
+            url="$(gh pr create --base main --head data-refresh --title "Rechargement des données du réseau" --body "$body")"
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Vérifications de la pull request
+        if: steps.pr.outputs.url != ''
+        run: |
+          url="${{ steps.pr.outputs.url }}"
+          # Sans jeton personnel, la pull request ne lance pas « Tests » d'elle-même : on la lance ici.
+          if [ "$WITH_PAT" != "true" ]; then gh workflow run tests.yml --ref data-refresh; fi
+          # Attendre que les vérifications apparaissent sur la pull request (5 min au plus), puis leur fin.
+          for i in $(seq 1 30); do
+            [ "$(gh pr checks "$url" --json name --jq 'length' 2>/dev/null || echo 0)" -gt 0 ] && break
+            sleep 10
+          done
+          gh pr checks "$url" --watch --fail-fast --interval 15
+
+      - name: Fusion dans main et suppression de data-refresh
+        if: steps.pr.outputs.url != ''
+        run: |
+          gh pr merge "${{ steps.pr.outputs.url }}" --squash --delete-branch
+          # Une fusion faite par GITHUB_TOKEN ne déclenche pas la mise en ligne : on la relance.
+          if [ "$WITH_PAT" != "true" ]; then gh workflow run deploy.yml --ref main; fi
