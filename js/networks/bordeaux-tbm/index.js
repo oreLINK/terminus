@@ -37,7 +37,7 @@ export default {
   name: "TBM, Bordeaux Métropole",
 
   // Mode affiché tant que la personne n'en a pas choisi un autre dans la fenêtre Mode.
-  defaultFeature: "last-ride",
+  defaultFeature: "last-transport", // tram et bus de jour combinés (choix de l'auteur, 23/10/2026)
 
   // Zone desservie : sert au choix automatique de la ville d'après la position.
   // Boîte approximative autour de Bordeaux Métropole (non relevée sur un tracé officiel).
@@ -93,9 +93,9 @@ export default {
       // Correspondances à pied entre stations proches (tools/build-transfers.mjs), chargées avec les arrêts.
       loadTransfers: () => import("./transfers.js").then((m) => m.default),
       // Méthode de calcul : « siri » (horaires SIRI par ligne, l'ancienne) ou « offline » (horaires
-      // théoriques inclus, temps réel ciblé). Bascule prévue après la comparaison du soir (npm run
-      // compare) ; sans horaires pour la soirée, « offline » revient de lui-même à « siri ».
-      method: "siri",
+      // théoriques inclus, temps réel ciblé). « offline » depuis le 23/10/2026, après la comparaison
+      // de 17 h 39 (npm run compare) ; sans horaires pour la soirée, il revient de lui-même à « siri ».
+      method: "offline",
       clearCache: clearTimetableCache,
     },
 

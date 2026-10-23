@@ -24,7 +24,7 @@ Ce que le code sait faire, vu du développeur. Les fonctionnalités vues par l'u
 | **Calcul** | Itinéraire à rebours avec jusqu'à deux correspondances (Bob) | 🟢 | Profils par nombre de correspondances, pur, testé ; le plus tard, le plus pratique, le prochain ; boucles écartées |
 | | Correspondances à pied entre stations proches | 🟢 | Précalculées à la génération (IGN), aucun appel à l'exécution |
 | | Stations candidates ligne par ligne (Inès) | 🟢 | La plus proche de chaque ligne, pour qu'une ligne dense ne masque pas les autres |
-| | Nouvelle méthode : horaires du soir inclus (Léa) + temps réel ciblé (Rémi, Sam) | 🟢 | Bus et transport ; tram et TBNight encore sur l'ancienne méthode, en attente de la bascule |
+| | Nouvelle méthode : horaires du soir inclus (Léa) + temps réel ciblé (Rémi, Sam) | 🟢 | Tram (depuis le 23/10/2026), bus et transport ; TBNight encore sur l'ancienne méthode, en attente d'une comparaison une nuit de service |
 | | Ancienne méthode : horaires SIRI par ligne, par paliers | 🟢 | Gardée en secours (données manquantes ou périmées) jusqu'à la fin des tests de fiabilité |
 | | Modes combinés par assemblage des données (Colette) | 🟢 | « Le dernier transport » : arrêts, graphes, tracés et horaires du tram et du bus, sans fichier en double |
 | | Profils gardés d'un recalcul à l'autre | 🟡 | Jusqu'à 3 calculs par actualisation, environ 0,3 s sur téléphone en mode transport |
@@ -105,7 +105,7 @@ npm run shapes
 
 Relancez-la quand une ligne change de parcours. Sans tracé pour un tronçon, la carte relie les arrêts en ligne droite.
 
-`js/networks/bordeaux-tbm/evening/` contient les horaires théoriques du soir (21 jours), tirés du même GTFS, pour la nouvelle méthode de calcul : celle des modes bus et transport ; le tram et TBNight restent sur l'ancienne jusqu'à la bascule (le réglage « Méthode de calcul » de la page `/lab/` force l'une ou l'autre). Ils s'épuisent : l'Action « Données du réseau » les régénère chaque semaine. Sans horaires pour la soirée, le site revient à l'ancienne méthode.
+`js/networks/bordeaux-tbm/evening/` contient les horaires théoriques du soir (21 jours), tirés du même GTFS, pour la nouvelle méthode de calcul : celle des modes tram, bus et transport ; TBNight reste sur l'ancienne jusqu'à une comparaison une nuit de service (le réglage « Méthode de calcul » de la page `/lab/` force l'une ou l'autre). Ils s'épuisent : l'Action « Données du réseau » les régénère chaque semaine. Sans horaires pour la soirée, le site revient à l'ancienne méthode.
 
 ```sh
 npm run timetable
