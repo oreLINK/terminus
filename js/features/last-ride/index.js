@@ -5,6 +5,7 @@ import { buildIndex, nearestStations, candidateLines, routeRequests, plan, servi
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc, distanceM } from "../../core/util.js";
 import { fetchWalk, realWalk } from "../../core/walk-route.js";
+import { eveningJourneys, mergeLive, isoDate } from "../../core/timetable.js";
 import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
 import { setComputing } from "../../core/computing.js";
@@ -318,7 +319,11 @@ export function mount({ root, network, adapter, goal = "last" }) {
     );
     const failed = settled.filter((r) => r.status === "rejected");
     if (settled.length && failed.length === settled.length) throw failed[0].reason;
-    return { journeys: settled.filter((r) => r.status === "fulfilled").flatMap((r) => r.value), failed: failed.length };
+    // Chaque course garde le sens demandé (le flux ne le redonne pas), pour mergeLive.
+    const journeys = settled.flatMap((r, i) =>
+      r.status === "fulfilled" ? r.value.map((j) => ({ ...j, direction: requests[i].direction })) : [],
+    );
+    return { journeys, failed: failed.length };
   }
 
   // `visible` : calcul demandé par la personne (position saisie, actualisation, nouveau domicile)
@@ -364,7 +369,17 @@ export function mount({ root, network, adapter, goal = "last" }) {
       const serviceEnd =
         endHour == null ? Infinity : serviceEndAfter(now, { timeZone: network.timeZone, hour: endHour });
       const stages = loadStages(origins, dests);
-      for (const stage of stages) {
+      // Nouvelle méthode (horaires théoriques inclus, temps réel ciblé) si le réseau la choisit
+      // (adapter.method) ou si le mode test la force, et que les horaires couvrent la soirée ; sinon,
+      // l'ancienne ci-dessous.
+      const method = lab?.method ?? adapter.method ?? "siri";
+      const offline = method === "offline" ? await offlineJourneys(now, origins, dests, serviceEnd) : null;
+      if (state.unmounted) return;
+      if (offline) {
+        ({ journeys, failed, result } = offline);
+        now = clockNow();
+      }
+      for (const stage of offline ? [] : stages) {
         const todo = stage.filter((r) => !loaded.has(`${r.line}|${r.direction}`));
         if (result && !todo.length) continue;
         for (const r of todo) loaded.add(`${r.line}|${r.direction}`);
@@ -376,7 +391,11 @@ export function mount({ root, network, adapter, goal = "last" }) {
         result = plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now, serviceEnd, serviceGap });
         if (result.options.length) break;
       }
-      const overHint = Boolean(state.graph && stages[0].length);
+      // Avec les horaires théoriques, les courses passées sont connues : le calcul voit seul que le
+      // dernier est parti, sans cette déduction.
+      const overHint = Boolean(!offline && state.graph && stages[0].length);
+      // Mode test : la méthode réellement utilisée, lisible par la page d'essai et le bandeau.
+      if (lab) document.documentElement.dataset.method = offline ? "offline" : "siri";
       state.lastComputedFrom = here;
       keep({ result: settle(result, overHint), origins, dests, now, partial: failed > 0, journeys, serviceEnd, overHint });
       renderLast();
@@ -393,6 +412,53 @@ export function mount({ root, network, adapter, goal = "last" }) {
         compute({ visible: again });
       }
     }
+  }
+
+  // ---------- Nouvelle méthode : horaires théoriques inclus, temps réel ciblé ----------
+
+  // Calcul sur les horaires théoriques du soir (aucun appel), puis temps réel pour les seules lignes
+  // et sens du trajet affiché (1 à 3 appels), et nouveau calcul ; un second tour si le temps réel a
+  // déplacé le trajet sur d'autres lignes. null si les horaires manquent ou sont périmés.
+  async function offlineJourneys(now, origins, dests, serviceEnd) {
+    if (!adapter.evening) return null;
+    const evening = addDays(morning(), -1);
+    let journeys;
+    try {
+      journeys = await eveningJourneys(adapter.evening, [isoDate(evening), isoDate(addDays(evening, 1))], new Set(Object.keys(state.lineCodes)));
+    } catch {
+      return null;
+    }
+    if (!journeys) return null;
+    const run = () =>
+      plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now: clockNow(), serviceEnd, serviceGap });
+    let result = run();
+    let failed = 0;
+    const asked = new Set();
+    for (let round = 0; round < 2 && result.options.length; round++) {
+      const byId = new Map(journeys.map((j) => [j.id, j]));
+      const todo = [];
+      for (const option of [result.primary, result.comfortable, result.soonest]) {
+        for (const leg of option?.last.legs ?? []) {
+          const j = byId.get(leg.journeyId);
+          const key = `${j?.line}|${j?.direction}`;
+          if (j && !asked.has(key)) {
+            asked.add(key);
+            todo.push({ line: j.line, direction: j.direction });
+          }
+        }
+      }
+      if (!todo.length) break;
+      try {
+        const got = await loadJourneys(todo, serviceEnd);
+        failed += got.failed;
+        journeys = mergeLive(journeys, todo, got.journeys);
+      } catch {
+        failed += todo.length; // flux muet : les horaires théoriques restent
+        break;
+      }
+      result = run();
+    }
+    return { journeys, failed, result };
   }
 
   // Les horaires ne couvrent que jusqu'à la fin du service : l'API ne renvoie alors presque plus

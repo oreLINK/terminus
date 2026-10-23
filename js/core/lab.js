@@ -8,7 +8,8 @@ const KEY = "dt.lab.v1";
 
 export const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(globalThis.location?.hostname);
 
-// { clock, setAt, startHour, endHour, liveMin, countdownMin, screen } : chaque champ est facultatif.
+// { clock, setAt, startHour, endHour, liveMin, countdownMin, screen, method } : chaque champ est
+// facultatif. method : « siri » ou « offline » force la méthode de calcul (sinon, celle du réseau).
 export const lab = LOCAL ? readJSON(KEY) : null;
 
 // Horloge du site : en mode test, elle part de l'heure choisie et avance normalement.

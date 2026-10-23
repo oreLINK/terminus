@@ -55,6 +55,13 @@ npm run shapes
 
 Relancez-la quand une ligne change de parcours. Sans tracé pour un tronçon, la carte relie les arrêts en ligne droite.
 
+`js/networks/bordeaux-tbm/evening/` contient les horaires théoriques du soir (21 jours), tirés du même GTFS, pour la nouvelle méthode de calcul, encore à l'essai (réglage « Méthode de calcul » de la page `/lab/`). Ils s'épuisent : relancez la commande chaque semaine. Sans horaires pour la soirée, le site revient à l'ancienne méthode.
+
+```sh
+npm run timetable
+npm run compare   # compare les deux méthodes sur le tram : à lancer de préférence le soir
+```
+
 Relancez `npm run graph` après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée et hors travaux** : le soir ou un jour de travaux, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
 
 ## Branches, contributions et GitHub
@@ -78,8 +85,9 @@ Mettez à jour les fichiers Markdown concernés avec chaque changement : `PROJEC
 
 ### Actions
 
-- `.github/workflows/tests.yml` (**Tests**) : `npm test` à chaque push sur `dev` et sur chaque pull request vers `main`.
+- `.github/workflows/tests.yml` (**Tests**) : `npm test` à la demande, à chaque push sur `dev` et sur chaque pull request vers `main`.
 - `.github/workflows/deploy.yml` (**Déploiement GitHub Pages**) : à chaque push sur `main` (donc à chaque merge), et à la demande depuis l'onglet Actions. Relance les tests, assemble le site dans `_site/` (`index.html`, `mentions-legales.html`, `confidentialite.html`, `css/`, `js/`, `vendor/`, `.nojekyll` et `version.json` avec le commit et la date), puis le pousse sur `gh-pages`. La branche est créée au premier déploiement et garde l'historique des versions. Il n'y a pas de compilation : le site reste statique, sans dépendance d'exécution.
+- `.github/workflows/data.yml` (**Données du réseau**) : chaque lundi vers 6 h (heure de Paris) et à la demande. Crée la branche `data-refresh` depuis `main`, y recharge les horaires du soir (`npm run timetable`) et les tracés (`npm run shapes`) depuis le GTFS, lance `npm test`, ouvre une pull request `data-refresh` → `main`, attend que ses vérifications (l'Action « Tests », lancée sur la branche) passent, la fusionne, supprime `data-refresh` et relance la mise en ligne. Une semaine en échec laisse la pull request ouverte ; la suivante la met à jour. Réglage à activer une fois : *Settings → Actions → General → « Allow GitHub Actions to create and approve pull requests »*. Jeton personnel en secret `DATA_PR_TOKEN` facultatif (si la protection de `main` l'exige). Ces fusions arrivent sur `main` sans passer par `dev` : fusionnez `main` dans `dev` (`git merge origin/main`) avant d'ouvrir une pull request `dev` → `main`, en gardant la version de `main` pour les fichiers générés (ou en les régénérant).
 
 La version en ligne est consultable à `https://<utilisateur>.github.io/<repo>/version.json`.
 
@@ -134,6 +142,8 @@ js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)
 tools/build-shapes.mjs               génération du tracé des lignes depuis le GTFS (npm run shapes)
+tools/build-timetable.mjs            génération des horaires du soir depuis le GTFS (npm run timetable)
+tools/compare-methods.mjs            comparaison des deux méthodes de calcul (npm run compare)
 tools/serve.py                       serveur local sans cache (npm run serve)
 lab/                                page de tests locale (heure simulée, écrans forcés), jamais publiée
 js/features/index.js                 registre des modes
@@ -144,6 +154,7 @@ js/features/last-ride/               « Le dernier tram » : écrans et calcul p
 js/features/night-ride/              « Le prochain bus de nuit » (TBNight), même écran
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
 tests/registry.test.mjs              tests des registres et du stockage de la destination
+tests/timetable.test.mjs             tests des horaires inclus (heures GTFS, jours manquants, fusion avec le temps réel)
 tests/walk-route.test.mjs            tests de l'itinéraire piéton (réponse IGN, nouvel essai, temps de marche)
 tests/line-trace.test.mjs            tests des tracés de lignes (encodage, découpage, couverture TBM)
 tests/themes.test.mjs                tests du calendrier des thèmes (dates, fichiers, accord avec THEMES.md)

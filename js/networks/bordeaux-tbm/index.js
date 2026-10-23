@@ -4,6 +4,20 @@
 import { loadTimetable, clearTimetableCache } from "./siri-lite.js";
 import { isPublicHoliday } from "../../core/holidays.js";
 
+// Horaires théoriques du soir (tools/build-timetable.mjs) : un index et un fichier par type de jour,
+// chargés à la demande. `refs` traduit les identifiants GTFS en identifiants SIRI (vérifié le
+// 23/10/2026 : route_id 59 = bordeaux:Line:59:LOC, quai 3684 = bordeaux:StopPoint:BP:3684:LOC,
+// trip_id b_268440007_23 = bordeaux:ServiceJourney:b_268440007_23:LOC).
+const evening = {
+  loadIndex: () => import("./evening/index.js").then((m) => m.default),
+  loadDay: (type) => import(`./evening/day-${type}.js`).then((m) => m.default),
+  refs: {
+    line: (route) => `bordeaux:Line:${route}:LOC`,
+    stop: (stop) => `bordeaux:StopPoint:BP:${stop}:LOC`,
+    journey: (trip) => `bordeaux:ServiceJourney:${trip}:LOC`,
+  },
+};
+
 // Ancien cache du réseau (lignes et arrêts lus dans l'API, ~24 h), remplacé par stops.js : on libère la place.
 try {
   localStorage.removeItem("dt.network.v1");
@@ -70,6 +84,11 @@ export default {
       loadGraph: () => import("./graph.js").then((m) => m.default), // → { names, patterns: [{ line, direction, stops }] }
       // Tracé réel des lignes (GTFS, tools/build-shapes.mjs), pour la carte ; chargé avec elle.
       loadShapes: () => import("./shapes.js").then((m) => m.default), // → { lines: { [code]: [encodeLine(…)] } }
+      evening, // horaires théoriques du soir, pour la nouvelle méthode de calcul
+      // Méthode de calcul : « siri » (horaires SIRI par ligne, l'ancienne) ou « offline » (horaires
+      // théoriques inclus, temps réel ciblé). Bascule prévue après la comparaison du soir (npm run
+      // compare) ; sans horaires pour la soirée, « offline » revient de lui-même à « siri ».
+      method: "siri",
       clearCache: clearTimetableCache,
     },
 
@@ -115,6 +134,7 @@ export default {
       loadTimetable,
       loadGraph: () => import("./night-graph.js").then((m) => m.default),
       loadShapes: () => import("./shapes.js").then((m) => m.default), // N1 à N8, dans le même fichier
+      evening,
       clearCache: clearTimetableCache,
     },
   },

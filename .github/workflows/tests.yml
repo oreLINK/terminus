@@ -1,4 +1,5 @@
-# Tests à chaque push sur dev et sur chaque pull request vers main.
+# Tests à chaque push sur dev, sur chaque pull request vers main, et à la demande (l'Action « Données du
+# réseau » les lance ainsi sur la branche data-refresh : leur résultat s'affiche sur sa pull request).
 # Le job « Tests » peut être exigé par la règle de protection de main.
 name: Tests
 
@@ -7,6 +8,7 @@ on:
     branches: [dev]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
