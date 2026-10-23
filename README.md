@@ -62,6 +62,12 @@ npm run timetable
 npm run compare   # compare les deux méthodes sur le tram : à lancer de préférence le soir
 ```
 
+`js/networks/bordeaux-tbm/transfers.js` et `night-transfers.js` contiennent les correspondances à pied entre stations proches de noms différents, avec leur marche par les rues calculée une fois par l'IGN. Relancez-les après `npm run graph` (les stations viennent des arrêts) :
+
+```sh
+npm run transfers
+```
+
 Relancez `npm run graph` après un changement de desserte (nouvelle ligne, prolongement, nouveaux quais), **en journée et hors travaux** : le soir ou un jour de travaux, certaines branches n'ont plus de course et manqueraient au graphe. Relisez le diff avant de commiter. Un graphe périmé ne casse rien (le calcul charge alors tout le réseau), il le rend seulement plus lent.
 
 ## Branches, contributions et GitHub
@@ -141,6 +147,7 @@ js/core/                             position, destination, stockage, feuilles, 
 js/networks/index.js                 registre des réseaux
 js/networks/bordeaux-tbm/            réseau TBM : configuration, client SIRI-Lite, graphe généré
 tools/build-graph.mjs                génération du graphe du réseau (npm run graph)
+tools/build-transfers.mjs            génération des correspondances à pied (npm run transfers)
 tools/build-shapes.mjs               génération du tracé des lignes depuis le GTFS (npm run shapes)
 tools/build-timetable.mjs            génération des horaires du soir depuis le GTFS (npm run timetable)
 tools/compare-methods.mjs            comparaison des deux méthodes de calcul (npm run compare)
@@ -154,6 +161,7 @@ js/features/last-ride/               « Le dernier tram » : écrans et calcul p
 js/features/night-ride/              « Le prochain bus de nuit » (TBNight), même écran
 tests/planner.test.mjs               tests du calcul et du parsing SIRI-Lite
 tests/registry.test.mjs              tests des registres et du stockage de la destination
+tests/transfers.test.mjs             tests des correspondances à pied générées (stations, distances, tracés)
 tests/timetable.test.mjs             tests des horaires inclus (heures GTFS, jours manquants, fusion avec le temps réel)
 tests/walk-route.test.mjs            tests de l'itinéraire piéton (réponse IGN, nouvel essai, temps de marche)
 tests/line-trace.test.mjs            tests des tracés de lignes (encodage, découpage, couverture TBM)

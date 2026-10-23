@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseJourneys } from "../js/networks/bordeaux-tbm/siri-lite.js";
-import { buildIndex, nearestStations, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, sameTrip, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
+import { buildIndex, nearestStations, candidateStations, transferMap, candidateLines, routeRequests, plan, serviceEndAfter, inServiceWindow, sameTrip, TRANSFER_MS, WALK_MARGIN_MS } from "../js/features/last-ride/planner.js";
 
 // Ligne A fictive d'ouest en est : Ouest -> Centre -> Pont -> Est, un quai par sens.
 const A = "bordeaux:Line:59:LOC";
@@ -392,7 +392,7 @@ test("parseJourneys lit le format Mecatran et privilégie le temps réel", () =>
                       ],
                     },
                   },
-                  { LineRef: { value: A }, Cancellation: true, EstimatedCalls: { EstimatedCall: [] } },
+                  { LineRef: { value: A }, VehicleJourneyRef: { value: "bordeaux:ServiceJourney:y:LOC" }, Cancellation: true, EstimatedCalls: { EstimatedCall: [] } },
                 ],
               },
             ],
@@ -401,10 +401,102 @@ test("parseJourneys lit le format Mecatran et privilégie le temps réel", () =>
       },
     },
   };
-  const [j, ...rest] = parseJourneys(json);
+  const [j, cancelled, ...rest] = parseJourneys(json);
   assert.equal(rest.length, 0);
+  // La course annulée est gardée, marquée, pour retirer sa jumelle théorique ; le calcul l'ignore.
+  assert.equal(cancelled.cancelled, true);
   assert.equal(j.headsign, "Est");
   assert.equal(j.calls[0].dep, Date.parse("2026-09-27T21:12:00Z"));
   assert.equal(j.calls[0].depLive, true);
   assert.equal(j.calls[1].depLive, false);
+});
+
+// ---------- Correspondances à pied (étape 2) ----------
+
+// Une ligne C part de « Parvis », station au nom différent à ~300 m à l'est de Centre, vers Est.
+const C = "bordeaux:Line:61:LOC";
+const STOPS_C = [...STOPS, { ref: "PV0", name: "Parvis", lat: 44.84, lon: -0.5762, lines: [C] }];
+const indexC = buildIndex(STOPS_C);
+const codesC = { ...CODES, [C]: "C" };
+const fromParvis = (id, start) => ({
+  id,
+  line: C,
+  headsign: "Est",
+  calls: [call("PV0", "Parvis", start), call("E0", "Est", start + 7 * 60000)],
+});
+const runC = (journeys, transfers) => {
+  const origins = nearestStations(indexC.stations, nord, { radius: 1000, min: 1, max: 8 });
+  const dests = nearestStations(indexC.stations, home, { radius: 500, min: 1, max: 5 });
+  return plan({ origins, dests, journeys, index: indexC, lineCodes: codesC, now: NOW, serviceEnd: serviceEndAfter(NOW, SERVICE), transfers });
+};
+
+test("correspondance à pied : B jusqu'à Centre, marche jusqu'à Parvis, puis C", () => {
+  const transfers = transferMap([["centre", "parvis", 320, null]], indexC);
+  // B arrive à Centre à +38 ; 320 m à pied (4 min 07 s) plus 2 min de marge : prêt à +44 min 07 s.
+  const journeys = [southbound("b1", min(30)), fromParvis("trop-tot", min(44)), fromParvis("c1", min(45))];
+  assert.notEqual(runC(journeys, null).status, "ok"); // sans marche entre stations, aucun trajet
+  const r = runC(journeys, transfers);
+  assert.equal(r.status, "ok");
+  const legs = r.soonest.last.legs;
+  assert.deepEqual(legs.map((l) => l.journeyId), ["b1", "c1"]);
+  assert.equal(legs[0].to.name, "Centre");
+  assert.equal(legs[0].walkAfter.to, "parvis");
+  assert.equal(legs[0].walkAfter.seconds, 247);
+  assert.equal(legs[1].from.name, "Parvis");
+  assert.equal(legs[1].walkAfter, null);
+});
+
+test("correspondance à pied : symétrique, et les stations inconnues sont ignorées", () => {
+  const m = transferMap([["centre", "parvis", 320, null], ["centre", "inconnue", 100, null]], indexC);
+  assert.deepEqual(m.get("parvis").map((w) => w.to), ["centre"]);
+  assert.deepEqual(m.get("centre").map((w) => w.to), ["parvis"]);
+  assert.equal(m.has("inconnue"), false);
+});
+
+test("candidats ligne par ligne : la station la plus proche de chaque ligne, pas les plus proches", () => {
+  const near = (x) => x.map((c) => c.station.name).sort();
+  // Devant Centre : Pont (ligne A seulement, déjà couverte par Centre) n'apporte rien, Parvis apporte C.
+  assert.deepEqual(near(candidateStations(indexC.stations, here, { radius: 2000, min: 1, max: 8 })), ["Centre", "Parvis"]);
+  assert.ok(near(nearestStations(indexC.stations, here, { radius: 2000, min: 1, max: 8 })).includes("Pont"));
+});
+
+test("graphe : une correspondance à pied fait charger la ligne qui part de la station voisine", () => {
+  const graphC = { ...GRAPH, names: { ...GRAPH.names, PV0: "Parvis" }, patterns: [...GRAPH.patterns, { line: C, direction: "0", stops: ["PV0", "E0"] }] };
+  const args = {
+    graph: graphC,
+    index: indexC,
+    origins: nearestStations(indexC.stations, nord, { radius: 500, min: 1, max: 8 }),
+    dests: nearestStations(indexC.stations, home, { radius: 500, min: 1, max: 5 }),
+  };
+  const lines = (r) => r.map((x) => codesC[x.line]).sort();
+  assert.ok(!lines(routeRequests(args)).includes("C"));
+  assert.ok(lines(routeRequests({ ...args, transfers: transferMap([["centre", "parvis", 320, null]], indexC) })).includes("C"));
+});
+
+test("correspondance à pied : à arrivée égale, pas de marche inutile", () => {
+  // Une course B va de Nord à Centre puis Pont. La C passe à Parvis, puis Centre, puis Est. Descendre
+  // à Centre pour la C, ou continuer jusqu'à Pont et revenir à pied à Parvis, donne la même C : on
+  // reste dans le tram jusqu'à Centre.
+  const transfers = transferMap([["pont", "parvis", 320, null]], indexC);
+  const b = { id: "b", line: B, headsign: "Pont", calls: [call("N0", "Nord", min(30)), call("C0", "Centre", min(38)), call("P0", "Pont", min(41))] };
+  const c = { id: "c", line: C, headsign: "Est", calls: [call("PV0", "Parvis", min(48)), call("C0", "Centre", min(50)), call("E0", "Est", min(56))] };
+  const legs = runC([b, c], transfers).soonest.last.legs;
+  assert.deepEqual(legs.map((l) => l.journeyId), ["b", "c"]);
+  assert.equal(legs[0].to.name, "Centre");
+  assert.equal(legs[0].walkAfter, null);
+});
+
+test("une course annulée du flux ne roule pas", () => {
+  const cancelled = { ...eastbound("annulee", min(20)), cancelled: true };
+  const r = run([eastbound("tot", min(10)), cancelled]);
+  assert.equal(r.primary.last.journeyId, "tot");
+});
+
+test("un trajet qui revient à sa station de départ est écarté", () => {
+  // Depuis Centre : A vers Pont, puis A en sens inverse jusqu'à Centre, puis… : boucle. Le trajet
+  // direct de Centre vers Est reste.
+  const back = { id: "retour", line: A, headsign: "Ouest", calls: [call("P0", "Pont", min(30)), call("C1", "Centre", min(33))] };
+  const r = run([eastbound("aller", min(20)), back, eastbound("direct", min(10))]);
+  for (const o of r.options) for (const t of o.catchable) assert.ok(!t.legs.some((l, i) => i > 0 && l.to.id === t.legs[0].from.id));
+  assert.equal(r.soonest.last.journeyId, "direct");
 });

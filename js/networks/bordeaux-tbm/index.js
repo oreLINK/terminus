@@ -85,6 +85,8 @@ export default {
       // Tracé réel des lignes (GTFS, tools/build-shapes.mjs), pour la carte ; chargé avec elle.
       loadShapes: () => import("./shapes.js").then((m) => m.default), // → { lines: { [code]: [encodeLine(…)] } }
       evening, // horaires théoriques du soir, pour la nouvelle méthode de calcul
+      // Correspondances à pied entre stations proches (tools/build-transfers.mjs), chargées avec les arrêts.
+      loadTransfers: () => import("./transfers.js").then((m) => m.default),
       // Méthode de calcul : « siri » (horaires SIRI par ligne, l'ancienne) ou « offline » (horaires
       // théoriques inclus, temps réel ciblé). Bascule prévue après la comparaison du soir (npm run
       // compare) ; sans horaires pour la soirée, « offline » revient de lui-même à « siri ».
@@ -135,6 +137,7 @@ export default {
       loadGraph: () => import("./night-graph.js").then((m) => m.default),
       loadShapes: () => import("./shapes.js").then((m) => m.default), // N1 à N8, dans le même fichier
       evening,
+      loadTransfers: () => import("./night-transfers.js").then((m) => m.default),
       clearCache: clearTimetableCache,
     },
   },

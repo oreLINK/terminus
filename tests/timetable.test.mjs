@@ -39,18 +39,32 @@ test("horaires théoriques : un jour absent rend null (fichier périmé, retour 
   assert.equal((await eveningJourneys(source, ["2026-10-24"], new Set(["bordeaux:Line:60:LOC"]))).length, 0);
 });
 
-test("temps réel ciblé : il remplace la fenêtre qu'il couvre, supprime les courses absentes, garde la suite", () => {
+test("temps réel ciblé : il corrige et annule, mais une absence ne supprime rien", () => {
   const theo = (id, dep, line = "L", direction = "0") => ({ id, line, direction, theoretical: true, calls: [{ dep }] });
-  const live = (id, dep) => ({ id, line: "L", direction: "0", calls: [{ dep, depLive: true }] });
-  const journeys = [theo("a", 10), theo("b", 20), theo("supprimee", 30), theo("c", 40), theo("au-dela", 90), theo("autre", 20, "M")];
-  const merged = mergeLive(journeys, [{ line: "L", direction: "0" }], [live("a", 12), live("b", 21), live("c", 41)]);
-  assert.deepEqual(merged.map((j) => j.id).sort(), ["a", "au-dela", "autre", "b", "c"]);
-  assert.equal(merged.find((j) => j.id === "a").calls[0].dep, 12);
-  // Un flux vide ne prouve rien : les courses théoriques restent.
-  assert.equal(mergeLive(journeys, [{ line: "L", direction: "0" }], []).length, journeys.length);
-  // Un second tour remplace l'ancien temps réel, sans doublon.
-  const again = mergeLive(merged, [{ line: "L", direction: "0" }], [live("a", 13), live("b", 22), live("c", 42)]);
+  const live = (id, dep, followed = true) => ({ id, line: "L", direction: "0", calls: [{ dep, depLive: followed }] });
+  const H = 3600 * 1000;
+  const journeys = [theo("a", 10 * H), theo("absente", 11 * H), theo("annulee", 12 * H), theo("autre", 10 * H, "M")];
+  const merged = mergeLive(journeys, [{ line: "L", direction: "0" }], [
+    live("a", 10 * H + 120_000), // corrige « a »
+    { id: "annulee", line: "L", direction: "0", calls: [], cancelled: true }, // annule
+    live("fantome", 13 * H, false), // sans jumelle ni suivi : ignorée
+    live("renfort", 14 * H), // sans jumelle, suivie en direct : ajoutée
+    live("absente", 11 * H - 24 * H), // même identifiant, la veille : ne remplace pas la course de ce soir
+  ]);
+  const ids = merged.map((j) => j.id).sort();
+  assert.ok(ids.includes("absente"), "une course absente du flux reste");
+  assert.ok(!ids.includes("annulee"), "une course annulée est retirée");
+  assert.ok(!ids.includes("fantome"), "une course sans jumelle ni suivi est ignorée");
+  assert.ok(ids.includes("renfort") && ids.includes("autre"));
+  assert.equal(merged.find((j) => j.id === "a").calls[0].dep, 10 * H + 120_000);
+  assert.equal(merged.find((j) => j.id === "absente" && j.theoretical).calls[0].dep, 11 * H);
+  // Un second tour remplace l'ancien temps réel, sans doublon ni perte.
+  const again = mergeLive(merged, [{ line: "L", direction: "0" }], [live("a", 10 * H + 180_000)]);
   assert.equal(again.filter((j) => j.id === "a").length, 1);
+  assert.equal(again.find((j) => j.id === "a").calls[0].dep, 10 * H + 180_000);
+  assert.ok(again.some((j) => j.id === "renfort"));
+  // Un (ligne, sens) non interrogé n'est pas touché.
+  assert.equal(mergeLive(journeys, [{ line: "M", direction: "0" }], [live("a", 1)]).find((j) => j.id === "a").calls[0].dep, 10 * H);
 });
 
 test("horaires générés : chaque jour a son fichier, et les quais du tram sont ceux de stops.js", async () => {

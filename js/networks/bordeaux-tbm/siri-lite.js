@@ -88,13 +88,16 @@ export async function loadNetwork(kind = "tram") {
   return { lines, stops };
 }
 
+// Courses du flux, au format commun (voir js/core/timetable.js). Une course annulée est gardée, avec
+// `cancelled: true` (et parfois sans passage) : la nouvelle méthode s'en sert pour retirer la course
+// théorique correspondante ; le calcul les ignore.
 export function parseJourneys(json) {
   const out = [];
   const deliveries = asArray(json?.Siri?.ServiceDelivery?.EstimatedTimetableDelivery);
   for (const delivery of deliveries) {
     for (const frame of asArray(delivery.EstimatedJourneyVersionFrame)) {
       for (const j of asArray(frame.EstimatedVehicleJourney)) {
-        if (j.Cancellation === true) continue;
+        const cancelled = j.Cancellation === true;
         const rawCalls = [...asArray(j.RecordedCalls?.RecordedCall), ...asArray(j.EstimatedCalls?.EstimatedCall)];
         const calls = rawCalls
           .map((c) => {
@@ -113,13 +116,13 @@ export function parseJourneys(json) {
             };
           })
           .filter((c) => c.dep != null);
+        const id = val(j.VehicleJourneyRef) || val(j.DatedVehicleJourneyRef) || (calls[0] && `${val(j.LineRef)}:${calls[0].dep}`);
+        if (cancelled) {
+          if (id) out.push({ id, line: val(j.LineRef), headsign: calls.at(-1)?.name ?? "", calls, cancelled: true });
+          continue;
+        }
         if (calls.length < 2) continue;
-        out.push({
-          id: val(j.VehicleJourneyRef) || val(j.DatedVehicleJourneyRef) || `${val(j.LineRef)}:${calls[0].dep}`,
-          line: val(j.LineRef),
-          headsign: calls[calls.length - 1].name,
-          calls,
-        });
+        out.push({ id, line: val(j.LineRef), headsign: calls[calls.length - 1].name, calls });
       }
     }
   }

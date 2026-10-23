@@ -14,6 +14,8 @@ export function distanceM(a, b) {
 
 // Minutes de marche pour une distance, arrondies à la minute supérieure, au moins 1.
 export const walkMinutes = (meters) => Math.max(1, Math.ceil(meters / WALK_M_PER_MIN));
+// Secondes de marche, sans arrondi à la minute (correspondances à pied).
+export const walkSeconds = (meters) => Math.ceil((meters / WALK_M_PER_MIN) * 60);
 
 // Estimation sans itinéraire : la distance à vol d'oiseau, allongée de 30 % pour les rues.
 // La marche réelle (js/core/walk-route.js) la remplace quand elle est connue.
