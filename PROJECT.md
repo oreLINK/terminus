@@ -115,6 +115,7 @@ Seule Bordeaux Métropole est couverte pour le moment. Chaque nouvelle ville aur
 | | Réglages | 🟡 | |
 | | Plusieurs langues | 🟡 | |
 | | Installation sur l'écran d'accueil | 🟡 | |
+| | Donner son avis sur un trajet | 🟡 | |
 
 </details>
 
@@ -145,6 +146,11 @@ Ce qui est prévu, sans date ni ordre garanti. Une fonctionnalité quitte cette 
 - **Partager mon trajet** : un bouton qui ouvre le partage de votre téléphone avec un message prêt à envoyer à un proche, par exemple « Je pars de la place de la Victoire à 23 h 40, j'arrive vers 0 h 10 ». Votre adresse n'y figure pas.
 - **Besoin d'aide** : un accès direct pour appeler le 17 ou le 112, ou écrire au 114 par SMS, et pour partager votre position, avec une sirène et un écran qui clignote pour attirer l'attention. Il ne remplacera pas les services d'urgence.
 - **Me prévenir avant de partir** : une notification quelques minutes avant l'heure limite, même quand Terminus n'est pas à l'écran (après l'avoir installé sur l'écran d'accueil).
+
+**Votre avis**
+
+- **Ce trajet vous a aidé ?** Sous le trajet proposé, un pouce vert si tout s'est bien passé, un pouce rouge sinon. Avec le pouce rouge, vous pouvez dire ce qui n'allait pas (le tram n'est pas passé, mauvais arrêt, temps de marche faux, trop compliqué…) et ajouter un mot si vous le souhaitez.
+- **Un rapport anonyme, seulement si vous le voulez** : une case, décochée par défaut, joint à votre avis la description du calcul (ville, mode, lignes et stations du trajet, heure arrondie, temps réel ou horaire prévu), pour nous aider à corriger. Vous voyez exactement ce qui sera envoyé avant d'envoyer. Ni votre adresse, ni votre position, ni rien qui permette de vous reconnaître d'un avis à l'autre. Une vérification anti-robots, le plus souvent invisible, protège l'envoi.
 
 **Terminus à votre façon**
 
