@@ -1592,9 +1592,43 @@ main {
 }
 
 .suggestions li {
-  padding: 0.7rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 8px;
   cursor: pointer;
+}
+
+/* Pictogramme du genre de suggestion : lieu connu, station, adresse (js/core/address-field.js). */
+.suggestion-glyph {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.suggestion.is-place .suggestion-glyph,
+.suggestion.is-station .suggestion-glyph {
+  stroke: var(--accent);
+}
+
+.suggestion-text {
+  display: grid;
+  min-width: 0;
+}
+
+.suggestion-detail {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .suggestions li:hover,

@@ -36,7 +36,7 @@ jobs:
       - name: Assembler le site
         run: |
           mkdir _site
-          cp -R index.html mentions-legales.html confidentialite.html css js vendor icons _site/
+          cp -R index.html mentions-legales.html confidentialite.html sw.js css js vendor icons _site/
           # Version publiée, consultable à /version.json.
           printf '{"commit":"%s","date":"%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > _site/version.json
 

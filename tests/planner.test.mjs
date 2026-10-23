@@ -121,6 +121,19 @@ test("plus aucun tram atteignable : statut missed", () => {
   assert.equal(r.status, "missed");
 });
 
+test("courses terminées : écartées sans changer le résultat", () => {
+  // Deux courses finies (dont une vers l'ouest), deux à venir : même tracé qu'avec les seules courses à venir.
+  const upcoming = [eastbound("next", min(12)), eastbound("last", min(40))];
+  const all = run([eastbound("old", min(-120)), westbound("w-old", min(-90)), ...upcoming]);
+  const only = run(upcoming);
+  assert.equal(all.status, "ok");
+  assert.equal(all.status, only.status);
+  assert.equal(all.primary.leaveBy, only.primary.leaveBy);
+  assert.equal(all.primary.last.journeyId, "last");
+  assert.equal(all.comfortable.last.journeyId, only.comfortable.last.journeyId);
+  assert.equal(all.options.length, only.options.length);
+});
+
 test("le dernier tram est parti : statut over, pas none", () => {
   // Fin de service ou travaux nocturnes : la ligne a roulé plus tôt, plus rien ensuite.
   const r = run([eastbound("early", min(-90)), eastbound("gone", min(-10)), westbound("w1", min(20))]);

@@ -49,6 +49,11 @@ Si votre position est inconnue (localisation refusée ou introuvable), le compte
 - La carte (fond Plan IGN) : un aperçu sous le résumé, et la carte complète dans le détail, avec un bouton « Recentrer ». Le tram et le bus de nuit y suivent le vrai tracé de leur ligne, et la marche suit les rues.
 - Des temps de marche calculés par les rues.
 
+**Chercher votre destination**
+
+- Une adresse, mais aussi un lieu connu ou une station, pour votre position comme pour votre destination. Dès deux lettres, les lieux connus de Bordeaux (la Cité du Vin, la tour Pey-Berland, la gare Saint-Jean, l'Arkéa Arena…) et les stations de tram, de bus et de bus de nuit apparaissent en tête des suggestions, avant les adresses. Un pictogramme distingue le lieu, la station et l'adresse.
+- La recherche ne tient compte ni des accents ni des majuscules, et lit le début des mots : « pey » trouve la tour Pey-Berland, « cite du » la Cité du Vin, « opéra » la place de la Comédie. Sous une station, ses lignes ; sous un lieu, son genre et sa commune.
+
 **Votre confort**
 
 - Votre adresse floutée par défaut, contre les regards indiscrets.
@@ -105,7 +110,7 @@ Seule Bordeaux Métropole est couverte pour le moment. Chaque nouvelle ville aur
 | | Écran clair ou sombre | 🟢 | Selon le réglage du téléphone |
 | | Perturbations du réseau | 🟡 | |
 | | Position en temps réel du tram ou du bus sur la carte | 🟡 | |
-| | Lieux connus et stations dans la recherche d'adresse | 🟡 | |
+| | Lieux connus et stations dans la recherche d'adresse | 🟢 | Une cinquantaine de lieux, toutes les stations de tram, de bus et de bus de nuit |
 | | Rentrer à pied | 🟡 | |
 | | Météo du trajet | 🟡 | |
 | | Rester au sec | 🟡 | |
@@ -137,11 +142,6 @@ Ce qui est prévu, sans date ni ordre garanti. Une fonctionnalité quitte cette 
 - **Les perturbations** : les messages du réseau qui concernent les lignes de votre trajet.
 - **Voir arriver son tram ou son bus** : sur la carte, la position en temps réel du tram ou du bus de nuit que vous allez prendre, pour vous rassurer : il arrive bien. Sa position date d'environ une minute.
 
-**Chercher plus vite**
-
-- **Les lieux connus de Bordeaux** : dans la recherche d'adresse, dès les premières lettres, les lieux célèbres apparaissent parmi les suggestions (la Cité du Vin, la place Pey-Berland, la place de la Victoire…), pour votre position comme pour votre destination.
-- **Les stations et les arrêts** : chercher directement une station de tram ou un arrêt de bus par son nom, dans les mêmes suggestions.
-
 **Votre sécurité**
 
 - **Partager mon trajet** : un bouton qui ouvre le partage de votre téléphone avec un message prêt à envoyer à un proche, par exemple « Je pars de la place de la Victoire à 23 h 40, j'arrive vers 0 h 10 ». Votre adresse n'y figure pas.
@@ -170,6 +170,7 @@ Ce qui est prévu, sans date ni ordre garanti. Une fonctionnalité quitte cette 
 - Le temps réel n'est pas toujours disponible. Les départs éloignés dans le temps peuvent être des horaires prévus.
 - Les travaux programmés sont pris en compte quand ils figurent dans les horaires publiés par le réseau. Les messages de perturbation ne sont pas encore affichés.
 - Si aucun trajet n'est possible, si le dernier tram est déjà hors d'atteinte ou si le service est terminé (y compris plus tôt que d'habitude, un soir de travaux), Terminus l'indique. Il ne remplace pas les informations officielles du réseau.
+- Après une première visite, Terminus s'ouvre plus vite, même avec une connexion faible : votre téléphone garde une copie du site, renouvelée à chaque nouvelle version. Le temps réel, lui, demande toujours une connexion.
 - Votre destination est enregistrée dans le navigateur utilisé, et nulle part ailleurs. Terminus ne dépose aucun cookie et ne mesure pas l'audience. La page « Confidentialité », en bas de l'écran, détaille ce qui est échangé et permet d'effacer vos données.
 
 Terminus est un projet indépendant, sans lien avec TBM ni Keolis Bordeaux Métropole Mobilités.

@@ -2,7 +2,7 @@
 
 import { readJSON, writeJSON } from "./storage.js";
 
-const HOMES_KEY = "dt.homes.v1"; // { [networkId]: { label, lat, lon } }
+const HOMES_KEY = "dt.homes.v1"; // { [networkId]: { label, lat, lon, commune? } }
 
 const isPlace = (p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lon);
 
@@ -16,7 +16,9 @@ export function getHome(network) {
 }
 
 export function saveHome(network, place) {
-  const home = { label: place.label, lat: place.lat, lon: place.lon };
+  // `commune` : pour un lieu ou une station, dont le nom ne dit pas la commune (une adresse la donne
+  // dans son libellé : communeOf). Sert aux zones à la demande (TBNight).
+  const home = { label: place.label, lat: place.lat, lon: place.lon, ...(place.commune ? { commune: place.commune } : {}) };
   const homes = readJSON(HOMES_KEY) ?? {};
   homes[network.id] = home;
   writeJSON(HOMES_KEY, homes);

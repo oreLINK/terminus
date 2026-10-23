@@ -4,12 +4,13 @@
 import { transferMap, candidateLines, routeRequests, plan, sameTrip, SERVICE_GAP_MS, WALK_MARGIN_MS } from "./planner.js";
 import { buildIndex, candidateStations, zoneDests } from "../../core/stations.js";
 import { serviceEndAfter, inServiceWindow, serviceMorning, addDays, isoDate } from "../../core/dates.js";
-import { communeOf } from "../../core/text.js";
+import { communeOf, normCommune } from "../../core/text.js";
 import { createAddressField } from "../../core/address-field.js";
 import { clock, walkBetween, walkLink, esc, distanceM } from "../../core/util.js";
 import { icon } from "../../core/icons.js";
 import { fetchWalk, realWalk } from "../../core/walk-route.js";
-import { eveningJourneys, mergeLive } from "../../core/timetable.js";
+import { recallWalks, rememberWalks } from "../../core/walk-memory.js";
+import { eveningJourneys, mergeLive, mergeStopLive } from "../../core/timetable.js";
 import { decodeLine } from "../../core/line-trace.js";
 import { openSheet, closeSheet, sheetCurrent, sheetAction, sheetActions, sheetNote } from "../../core/sheet.js";
 import { location } from "../../core/location.js";
@@ -210,7 +211,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
     );
     createAddressField(body.querySelector(".sheet-field"), {
       label: "Où êtes-vous ?",
-      placeholder: "Adresse, lieu ou arrêt",
+      placeholder: "Adresse, lieu ou station",
       area,
       types: "StreetAddress,PositionOfInterest",
       onSelect(address) {
@@ -375,7 +376,7 @@ export function mount({ root, network, adapter, goal = "last" }) {
       // fixe de la ligne y mène sans marche (on reste dans le bus), même s'il est aussi à portée à pied.
       const zones = zoneDests({
         zones: adapter.zones,
-        commune: communeOf(state.home.label),
+        commune: state.home.commune ? normCommune(state.home.commune) : communeOf(state.home.label),
         graph: state.graph,
         index: state.index,
         lineCodes: state.lineCodes,
@@ -436,9 +437,12 @@ export function mount({ root, network, adapter, goal = "last" }) {
 
   // ---------- Nouvelle méthode : horaires théoriques inclus, temps réel ciblé ----------
 
-  // Calcul sur les horaires théoriques du soir (aucun appel), puis temps réel pour les seules lignes
-  // et sens du trajet affiché (1 à 3 appels), et nouveau calcul ; un second tour si le temps réel a
-  // déplacé le trajet sur d'autres lignes. null si les horaires manquent ou sont périmés.
+  // Calcul sur les horaires théoriques du soir (aucun appel), puis temps réel du seul trajet affiché,
+  // et nouveau calcul ; un second tour si le temps réel a déplacé le trajet. null si les horaires
+  // manquent ou sont périmés. Temps réel quai par quai (stop-monitoring : la montée et la descente de
+  // chaque tronçon, quelques Ko) ; une course absente de ces passages (annulée ? le flux ne le dit
+  // pas) est vérifiée par sa ligne entière (estimated-timetable), qui signale les annulations. Sans
+  // passages par quai (adaptateur qui ne les fournit pas), la ligne entière directement.
   async function offlineJourneys(now, origins, dests, serviceEnd) {
     if (!adapter.evening) return null;
     const evening = addDays(morning(), -1);
@@ -453,29 +457,52 @@ export function mount({ root, network, adapter, goal = "last" }) {
       plan({ origins, dests, journeys, index: state.index, lineCodes: state.lineCodes, now: clockNow(), serviceEnd, serviceGap, transfers: state.transfers });
     let result = run();
     let failed = 0;
-    const asked = new Set();
+    const askedStops = new Set();
+    const askedLines = new Set();
+    // Une ligne entière (estimated-timetable) : les courses du flux remplacent leurs jumelles.
+    const byLine = async (todo) => {
+      const fresh = todo.filter((r) => !askedLines.has(`${r.line}|${r.direction}`));
+      if (!fresh.length) return;
+      fresh.forEach((r) => askedLines.add(`${r.line}|${r.direction}`));
+      try {
+        const got = await loadJourneys(fresh, serviceEnd);
+        failed += got.failed;
+        journeys = mergeLive(journeys, fresh, got.journeys);
+      } catch {
+        failed += fresh.length; // flux muet : les horaires théoriques restent
+      }
+    };
     for (let round = 0; round < 2 && result.options.length; round++) {
       const byId = new Map(journeys.map((j) => [j.id, j]));
-      const todo = [];
-      for (const option of [result.primary, result.comfortable, result.soonest]) {
-        for (const leg of option?.last.legs ?? []) {
-          const j = byId.get(leg.journeyId);
-          const key = `${j?.line}|${j?.direction}`;
-          if (j && !asked.has(key)) {
-            asked.add(key);
-            todo.push({ line: j.line, direction: j.direction });
-          }
+      const legs = [result.primary, result.comfortable, result.soonest].flatMap((o) => o?.last.legs ?? []).filter((l) => byId.has(l.journeyId));
+      if (!adapter.loadStopVisits) {
+        await byLine(legs.map((l) => ({ line: byId.get(l.journeyId).line, direction: byId.get(l.journeyId).direction })));
+        result = run();
+        continue;
+      }
+      // Quais à interroger : montée et descente de chaque tronçon, jusqu'à son heure (+ 30 min).
+      const stops = new Map();
+      for (const l of legs) {
+        for (const [ref, t] of [[l.fromRef, l.dep], [l.toRef, l.arr]]) {
+          const key = `${ref}|${l.line}`;
+          if (!ref || askedStops.has(key)) continue;
+          stops.set(key, { ref, line: l.line, until: Math.max(stops.get(key)?.until ?? 0, t + 30 * 60 * 1000) });
         }
       }
-      if (!todo.length) break;
-      try {
-        const got = await loadJourneys(todo, serviceEnd);
-        failed += got.failed;
-        journeys = mergeLive(journeys, todo, got.journeys);
-      } catch {
-        failed += todo.length; // flux muet : les horaires théoriques restent
-        break;
-      }
+      if (!stops.size) break;
+      stops.forEach((_, key) => askedStops.add(key));
+      const requests = [...stops.values()];
+      const settled = await Promise.allSettled(
+        requests.map((r) => adapter.loadStopVisits(r.ref, r.line, { until: r.until, maxAge: ROUTE_MAX_AGE_MS })),
+      );
+      const answered = new Set(requests.filter((_, i) => settled[i].status === "fulfilled").map((r) => `${r.ref}|${r.line}`));
+      failed += settled.length - answered.size;
+      const merged = mergeStopLive(journeys, settled.flatMap((r) => (r.status === "fulfilled" ? r.value : [])));
+      journeys = merged.journeys;
+      // Tronçon dont la course manque aux passages sûrs de sa montée (absente, ou marquée douteuse :
+      // peut-être annulée), ou dont le quai n'a pas répondu : sa ligne entière, qui dit si elle est annulée.
+      const doubtful = legs.filter((l) => !merged.seen.has(`${l.journeyId}|${l.fromRef}`) || !answered.has(`${l.fromRef}|${l.line}`));
+      await byLine(doubtful.map((l) => ({ line: byId.get(l.journeyId).line, direction: byId.get(l.journeyId).direction })));
       result = run();
     }
     return { journeys, failed, result };
@@ -502,15 +529,27 @@ export function mount({ root, network, adapter, goal = "last" }) {
     const limit = side === "origins" ? MOVE_THRESHOLD_M : 20;
     const known = state.walks[side];
     if (!known || distanceM(known.anchor, from) > limit) {
-      state.walks[side] = { anchor: from, byId: new Map(), asked: new Set() };
+      state.walks[side] = { anchor: from, byId: new Map(), asked: new Set(), recalled: new Set() };
     }
     return state.walks[side];
   }
 
-  // Stations candidates avec leur marche réelle quand elle est connue, sinon l'estimation.
+  // Stations candidates avec leur marche réelle quand elle est connue, sinon l'estimation. Côté
+  // destination, les marches gardées d'une visite précédente (walk-memory.js) sont reprises d'abord :
+  // l'IGN n'est pas redemandé pour elles.
   function withRealWalks(list, side, from) {
-    const { byId } = walksFor(side, from);
-    return list.map((x) => (byId.has(x.station.id) ? { ...x, walk: byId.get(x.station.id) } : x));
+    const known = walksFor(side, from);
+    if (side === "dests") {
+      const fresh = list.map((x) => x.station).filter((st) => !known.recalled.has(st.id) && !known.byId.has(st.id));
+      if (fresh.length) {
+        for (const [id, walk] of recallWalks(network.id, from, fresh, clockNow())) {
+          known.byId.set(id, walk);
+          known.asked.add(id);
+        }
+        fresh.forEach((st) => known.recalled.add(st.id));
+      }
+    }
+    return list.map((x) => (known.byId.has(x.station.id) ? { ...x, walk: known.byId.get(x.station.id) } : x));
   }
 
   // Demande à l'IGN les marches encore inconnues (jusqu'aux arrêts autour de la position, depuis
@@ -542,6 +581,9 @@ export function mount({ root, network, adapter, goal = "last" }) {
     for (const d of dests) ask("dests", state.home, d, d.station, state.home);
     if (!jobs.length) return;
     const got = await Promise.all(jobs);
+    // Les marches de la destination servent aux visites suivantes.
+    const destWalks = state.walks.dests;
+    if (destWalks && distanceM(destWalks.anchor, state.home) <= 20) rememberWalks(network.id, state.home, dests.map((d) => d.station), destWalks.byId, clockNow());
     if (got.some(Boolean)) replan();
   }
 
@@ -1107,13 +1149,13 @@ export function mount({ root, network, adapter, goal = "last" }) {
       }`,
     );
     const field = createAddressField(body.querySelector(".sheet-field"), {
-      label: state.home ? "Nouvelle adresse" : "Adresse de destination",
-      placeholder: `Ex. ${area.addressExample}`,
+      label: state.home ? "Nouvelle destination" : "Votre destination",
+      placeholder: "Adresse, lieu ou station",
       area,
       types: "StreetAddress",
       hint: state.home
-        ? `Adresses de ${area.label} uniquement. Elle reste enregistrée dans ce navigateur.`
-        : `Adresses de ${area.label} uniquement.`,
+        ? `Adresse, lieu connu ou station, en ${area.label}. Elle reste enregistrée dans ce navigateur.`
+        : `Adresse, lieu connu ou station, en ${area.label}. Par exemple : ${area.addressExample}.`,
       onSelect(address) {
         state.home = saveHome(network, address);
         closeSheet();

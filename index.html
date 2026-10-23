@@ -13,6 +13,12 @@
   <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Terminus">
+  <!-- Connexions ouvertes d'avance (DNS, TCP, TLS : environ 150 à 250 ms en 4G) vers les services
+       appelés au premier calcul : TBM (temps réel) et l'IGN (marche, adresses en CORS ; tuiles de la
+       carte, chargées en images sans CORS, d'où la seconde ligne). -->
+  <link rel="preconnect" href="https://bdx.mecatran.com" crossorigin>
+  <link rel="preconnect" href="https://data.geopf.fr" crossorigin>
+  <link rel="preconnect" href="https://data.geopf.fr">
   <link rel="stylesheet" href="css/style.css">
   <script type="module" src="js/app.js"></script>
 </head>
