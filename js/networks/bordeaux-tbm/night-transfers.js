@@ -6,7 +6,7 @@
 // si l'IGN n'a pas répondu (estimation)]. Identifiants des stations : buildIndex(night-stops.js).
 
 export default {
-  generatedAt: "2026-10-23",
+  generatedAt: "2026-11-09",
   rows: [
     ["bourse du travail","costedoat",131,[4483210,-57830,-9,39,-86,-24]], // Bourse du Travail ↔ Costedoat
     ["bourse du travail","republique",472,[4483216,-57857,-15,66,321,-53,-5,-73]], // Bourse du Travail ↔ République

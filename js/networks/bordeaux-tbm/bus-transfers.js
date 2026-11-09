@@ -6,7 +6,7 @@
 // si l'IGN n'a pas répondu (estimation)]. Identifiants des stations : buildIndex(bus-stops.js).
 
 export default {
-  generatedAt: "2026-10-23",
+  generatedAt: "2026-11-09",
   rows: [
     ["4 pavillons vers buttiniere","4 pavillons",192,[4486558,-51445,15,63,28,11,14,31,66,25]], // 4 Pavillons (vers Buttinière) ↔ 4 Pavillons
     ["4 pavillons vers rocade","4 pavillons",263,[4486531,-51515,35,137,21,-3,19,18,9,23,66,25]], // 4 Pavillons (vers Rocade) ↔ 4 Pavillons
@@ -48,10 +48,6 @@ export default {
     ["avenue de capeyron","galaxie",331,[4486725,-71018,-76,11,-24,16,-21,44,-19,11,-28,66,-23,108]], // Avenue de Capeyron ↔ Galaxie
     ["avenue de la boetie vers cimetiere du taillan","college du taillan",582,[4490971,-67191,-11,111,-48,170,-2,10,6,8,157,6,47,12,8,-10,14,11,22,-12,41,2]], // Avenue de la Boétie (vers Cimetière du Taillan) ↔ Collège du Taillan
     ["avenue de la boetie","college du taillan",561,[4490970,-67165,-14,110,-44,145,-2,10,6,8,157,6,47,12,8,-10,14,11,22,-12,41,2]], // Avenue de la Boétie ↔ Collège du Taillan
-    ["avenue de magudas","bosquets",371,[4485558,-65479,-78,-6,-5,70,-68,2,-8,194]], // Avenue de Magudas ↔ Bosquets
-    ["avenue de magudas","les pins arret de descente",486,[4485558,-65479,20,-2,-29,-50,-10,-40,65,1,6,-8,13,-129,7,-217,-19,12]], // Avenue de Magudas ↔ Les Pins (arrêt de descente)
-    ["avenue de magudas","strelitzias",323,[4485558,-65479,26,-3,10,37,22,17,1,91,40,9,-16,147]], // Avenue de Magudas ↔ Strélitzias
-    ["avenue de magudas","vercors",248,[4485558,-65479,20,-2,-39,-76,0,-14,6,0,-5,-133,25,-6]], // Avenue de Magudas ↔ Vercors
     ["avenue du truc","merignac centre mediatheque",361,[4484375,-64554,-132,-102,-65,-6,6,-73,-6,-79]], // Avenue du Truc ↔ Mérignac Centre (Médiathèque)
     ["barriere de pessac boulevards","barriere de pessac",152,[4482574,-58996,-41,61,45,86]], // Barrière de Pessac (Boulevards) ↔ Barrière de Pessac
     ["barriere de pessac boulevards","caserne boudet",400,[4482593,-59010,-56,87,35,65,154,218]], // Barrière de Pessac (Boulevards) ↔ Caserne Boudet
@@ -86,8 +82,6 @@ export default {
     ["bibliotheque#1","meriadeck lateulade",542,[4483531,-58525,-21,-75,12,-4,2,-15,96,-63,9,5,10,-18,142,-26,10,122,41,-7]], // Bibliothèque ↔ Mériadeck Lateulade
     ["bibliotheque#1","patinoire",272,[4483498,-58686,17,58,9,9,96,-63,9,-23,-5,-24,-27,-50]], // Bibliothèque ↔ Patinoire
     ["bibliotheque#1","prefecture",282,[4483498,-58686,17,58,9,9,96,-63,9,5,10,-18,62,-12]], // Bibliothèque ↔ Préfecture
-    ["bierge","bruca",387,[4477279,-57719,-2,-64,-22,-67,2,-19,216,-78,-3,-13]], // Bierge ↔ Bruca
-    ["bierge","jules simon",494,[4477279,-57719,1,39,47,28,107,40,66,-85,-8,-40,-3,-60,21,-4,44,69]], // Bierge ↔ Jules Simon
     ["billaudel rue malbec","lafontaine",474,[4482486,-56355,-20,-30,167,-157,-34,-187,59,-16]], // Billaudel (rue Malbec) ↔ Lafontaine
     ["bleuets","caillou",482,[4485695,-63603,-11,-65,5,-2,72,38,236,204,5,2,5,-23]], // Bleuets ↔ Caillou
     ["bleuets","saint saens",527,[4485695,-63603,-5,-22,-31,19,-19,83,-48,122,-144,-61,-9,39,-81,-27]], // Bleuets ↔ Saint-Saëns
@@ -122,7 +116,7 @@ export default {
     ["cailleau","montsouris",422,[4490446,-51802,11,-6,13,-21,11,12,44,2,27,20,-5,45,7,12,-1,12,79,12,85,-5,3,53]], // Cailleau ↔ Montsouris
     ["camparian#1","bruca",466,[4477233,-57706,36,25,23,3,30,23,19,-104,5,-145,127,-43,-3,-13]], // Camparian ↔ Bruca
     ["camparian#1","jules simon",520,[4477233,-57706,36,25,23,3,22,20,120,46,66,-85,-8,-40,-3,-60,21,-4,44,69]], // Camparian ↔ Jules Simon
-    ["campeyraut","bordeaux carreire",342,[4482625,-59717,-53,-64,5,-63,-15,-14,11,-16,76,-188]], // Campeyraut ↔ Bordeaux Carreire
+    ["campeyraut","bordeaux carreire",377,[4482625,-59717,-53,-64,5,-63,-15,-14,11,-16,76,-188]], // Campeyraut ↔ Bordeaux Carreire
     ["campeyraut","privat",271,[4482625,-59717,-41,-44,-19,-31,-3,-17,-10,-3,-18,-32,-42,-44,5,-3,-44,-41]], // Campeyraut ↔ Privat
     ["campeyraut","stade chaban delmas",394,[4482796,-59685,65,111,72,-108,50,65,30,-45,10,4,17,-26]], // Campeyraut ↔ Stade Chaban Delmas
     ["campus carreire","tauzin",565,[4482225,-60604,35,59,12,78,-238,116,14,22,20,55,14,47,-1,19,29,6]], // Campus Carreire ↔ Tauzin
@@ -226,7 +220,6 @@ export default {
     ["domaine du gay","taris",472,[4485244,-48760,-21,-84,-50,-115,-38,-160,-19,-45,88,-91]], // Domaine du Gay ↔ Taris
     ["donnet","ateliers",594,[4482215,-56297,27,77,-127,145,101,106,-1,11,-78,115,-57,-31]], // Donnet ↔ Ateliers
     ["donnet","bauducheu",398,[4482215,-56297,27,77,-68,78,92,197,-3,21,-21,-21]], // Donnet ↔ Bauducheu
-    ["dorgeles#1","rene coty",314,[4484364,-65363,-123,2,-101,-9,-12,-13,-12,11,-27,2]], // Dorgelès ↔ René Coty
     ["dubedout","auditorium de floirac",360,[4484700,-51146,19,195,39,254]], // Dubedout ↔ Auditorium de Floirac
     ["ducasse","stade daugere",210,[4488327,-59366,31,-21,7,10,12,-3,51,80,46,42]], // Ducasse ↔ Stade Daugère
     ["ducourneau","college ausone",431,[4486874,-59189,90,-63,57,3,3,-12,11,-1,34,-128,65,-126]], // Ducourneau ↔ Collège Ausone
@@ -265,7 +258,7 @@ export default {
     ["france alouette","le trinquet",423,[4479956,-66242,-8,-22,0,-50,21,-6,182,-24,65,12,54,23]], // France Alouette ↔ Le Trinquet
     ["franklin","peydavant",441,[4479895,-58658,-11,153,5,10,97,12,9,-6,7,7,97,-11,60,-24]], // Franklin ↔ Peydavant
     ["frankton","pepinieres",528,[4490740,-62190,51,-60,26,-9,113,-83,13,31,17,17,-6,26,13,9,3,-13,15,2,102,27,4,-62]], // Frankton ↔ Pépinières
-    ["freres robinson","centre des impots",277,[4485121,-65540,153,9,94,20]], // Frères Robinson ↔ Centre des Impôts
+    ["freres robinson","centre des impots",340,[4485121,-65540,153,9,94,20]], // Frères Robinson ↔ Centre des Impôts
     ["g faure","jeunesse",406,[4485156,-63455,19,-159,-153,-53,17,-95,-21,-15]], // G. Fauré ↔ Jeunesse
     ["g faure","trianon",279,[4485156,-63455,19,-159,34,-186]], // G. Fauré ↔ Trianon
     ["gadret","bords de jalles",135,[4488751,-70425,65,6,2,15,8,7,-4,50]], // Gadret ↔ Bords de Jalles
@@ -273,7 +266,6 @@ export default {
     ["galerie des beaux arts","gambetta meriadeck terminus",351,[4483909,-58166,-25,-13,23,-8,-17,-108,47,-10,-16,-166,20,-4]], // Galerie des Beaux Arts ↔ Gambetta Mériadeck (Terminus)
     ["galerie des beaux arts","meriadeck",317,[4483878,-58177,-37,15,-28,-346]], // Galerie des Beaux Arts ↔ Mériadeck
     ["galerie des beaux arts","meriadeck lateulade",422,[4483878,-58177,-37,15,-36,-439,27,-5]], // Galerie des Beaux Arts ↔ Mériadeck Lateulade
-    ["galerie des beaux arts","palais de justice",190,[4483878,-58177,-167,56]], // Galerie des Beaux Arts ↔ Palais de Justice
     ["galerie des beaux arts","saint seurin",451,[4483909,-58166,-25,-13,160,-51,-3,-20,108,-55,-9,-119]], // Galerie des Beaux Arts ↔ Saint-Seurin
     ["galerie tatry","sousa mendes",261,[4486391,-57348,27,-32,89,147,-6,17,10,20,-9,40]], // Galerie Tatry ↔ Sousa Mendès
     ["gambetta","gambetta meriadeck",109,[4484086,-58091,-43,6,-26,-16,-4,-35]], // Gambetta ↔ Gambetta Mériadeck
@@ -344,7 +336,6 @@ export default {
     ["jeanne d arc#0","boulevard george v",489,[4482384,-59189,4,-4,145,258,-3,23,-124,192]], // Jeanne d'Arc ↔ Boulevard George V
     ["jeanne d arc#1","durcy",518,[4480292,-54562,-22,-28,-54,89,-151,110,-80,82,-37,-103]], // Jeanne d'Arc ↔ Durcy
     ["joliot curie#0","merignac centre",400,[4484118,-65117,-3,36,16,28,52,277,-2,92,-36,-9]], // Joliot Curie ↔ Mérignac Centre
-    ["joliot curie#0","merignac centre mediatheque",250,[4484118,-65117,-3,36,16,28,45,233]], // Joliot Curie ↔ Mérignac Centre (Médiathèque)
     ["joliot curie#0","parc du chateau",443,[4484122,-65253,9,-95,-25,-15,-161,-3,-2,-6,-60,49,-21,9,-30,40]], // Joliot Curie ↔ Parc du Château
     ["joliot curie#0","rene coty",137,[4484122,-65253,9,-95,-13,-6,-2,-18,-27,2]], // Joliot Curie ↔ René Coty
     ["joliot curie#1","ausone#2",412,[4489527,-51374,41,2,1,34,-25,124,5,259,30,3]], // Joliot Curie ↔ Ausone
@@ -383,10 +374,6 @@ export default {
     ["la morandiere av de magudas","gestform",392,[4485812,-67818,0,64,-13,35,-86,74,-24,8,-27,-4,-121,-42]], // La Morandière (av de Magudas) ↔ Gestform
     ["la morandiere av de magudas","la morandiere rue de la morandiere",186,[4485817,-67853,12,72,17,28,87,-6]], // La Morandière (av de Magudas) ↔ La Morandière (rue de La Morandière)
     ["la morandiere rue de la morandiere","betnoms",453,[4485933,-67759,-76,9,-28,-15,-17,11,-5,-149,3,-66,39,-170]], // La Morandière (rue de La Morandière) ↔ Betnoms
-    ["la morandiere","betnoms",386,[4485768,-67689,31,-30,13,-35,-5,-149,3,-66,39,-170]], // La Morandière ↔ Betnoms
-    ["la morandiere","gestform",266,[4485768,-67689,-55,44,-31,8,-141,-46]], // La Morandière ↔ Gestform
-    ["la morandiere","la morandiere av de magudas",126,[4485768,-67689,22,-17,18,-31,6,-31,-2,-50]], // La Morandière ↔ La Morandière (av de Magudas)
-    ["la morandiere","la morandiere rue de la morandiere",202,[4485768,-67689,32,-21,38,2,23,-33,18,-10,54,-8]], // La Morandière ↔ La Morandière (rue de La Morandière)
     ["la morlette","calmette#0",420,[4485487,-51804,-23,57,-18,1,-3,34,-27,36,-3,18,-145,-37,-18,-12,-68,-19]], // La Morlette ↔ Calmette
     ["la morlette","jean zay",316,[4485487,-51804,-26,69,-10,58,-17,19,6,59,-22,168]], // La Morlette ↔ Jean Zay
     ["la morlette","lagorgette",576,[4485535,-51879,-63,134,-13,57,-1,22,5,13,163,52,163,41]], // La Morlette ↔ Lagorgette
@@ -444,7 +431,7 @@ export default {
     ["les meridiennes","lanet",321,[4487242,-59959,-110,69,-74,65,73,52]], // Les Méridiennes ↔ Lanet
     ["les meridiennes","maumey",368,[4487252,-59964,161,-77,36,-7,24,9,75,86]], // Les Méridiennes ↔ Maumey
     ["les pins av magudas","les pins arret de descente",243,[4485728,-65917,-3,18,11,-94,-14,3,-111,78]], // Les Pins (av Magudas) ↔ Les Pins (arrêt de descente)
-    ["les pins#1","les pins av magudas",194,[4485651,-65939,71,-51,14,-3,-11,94,3,-18]], // Les Pins ↔ Les Pins (av Magudas)
+    ["les pins#1","les pins av magudas",217,[4485651,-65939,71,-51,14,-3,-11,94,3,-18]], // Les Pins ↔ Les Pins (av Magudas)
     ["les pres de jourdanne","brisson",516,[4494466,-53431,33,-89,68,-130,54,-131,5,-38,8,-11,-113,-96]], // Les Prés de Jourdanne ↔ Brisson
     ["lestonnat","place ozanam",451,[4485197,-61818,-93,4,-69,-7,-11,62,-11,32,-43,59,-29,28,15,106]], // Lestonnat ↔ Place Ozanam
     ["lewis brown","faure balguerie",426,[4486323,-56108,-35,64,134,195,-102,122]], // Lewis-Brown ↔ Faure - Balguerie
@@ -563,7 +550,6 @@ export default {
     ["nougueys","mairie de floirac",219,[4482935,-52851,83,128,19,-11,53,-3]], // Nougueys ↔ Mairie de Floirac
     ["nougueys","mascaret",319,[4482929,-52860,-47,-67,-15,18,-15,-16,-15,-1,-41,19,-23,-49,-46,50,-13,-27]], // Nougueys ↔ Mascaret
     ["nouzarede","martyrs de la resistance",283,[4480934,-56231,-69,50,-68,76,-12,27,-2,34,-11,7,-3,42]], // Nouzarède ↔ Martyrs de la Résistance
-    ["nungesser et coli","dorgeles#1",428,[4484151,-65590,-18,194,7,26,164,12,60,-5]], // Nungesser et Coli ↔ Dorgelès
     ["nungesser et coli","rene coty",211,[4484145,-65592,-20,209,-9,11,-27,2]], // Nungesser et Coli ↔ René Coty
     ["pacaris","benedigues",345,[4479714,-58019,40,-62,17,-13,10,-29,91,-137,10,-4,32,-71]], // Pacaris ↔ Bénédigues
     ["pacaris","montherlant",211,[4479714,-58019,48,-70,-13,-15,-99,-42]], // Pacaris ↔ Montherlant
@@ -611,8 +597,6 @@ export default {
     ["peyronnet","gare saint jean rue saint vincent de paul",422,[4482751,-56120,66,43,-49,213,-44,34,-75,83]], // Peyronnet ↔ Gare Saint-Jean (rue Saint-Vincent de Paul)
     ["peyronnet","gare saint jean sous la halle",384,[4482751,-56120,4,3,-38,73,-127,232,13,90]], // Peyronnet ↔ Gare Saint-Jean (sous la Halle)
     ["peyronnet","lycee gustave eiffel",283,[4482751,-56120,66,43,29,-125,6,-6,-4,-8,23,-98]], // Peyronnet ↔ Lycée Gustave Eiffel
-    ["pin galant","bedat",504,[4484445,-65154,-53,87,-24,55,46,21,40,-3,147,54,20,7,10,16,33,-51]], // Pin Galant ↔ Bedat
-    ["pin galant","merignac centre mediatheque",489,[4484445,-65154,-59,99,-85,230,-132,-35,7,40]], // Pin Galant ↔ Mérignac Centre (Médiathèque)
     ["pins francs","hopital suburbain",583,[4486642,-62318,7,-9,156,202,49,34,-159,245,4,16]], // Pins-Francs ↔ Hôpital Suburbain
     ["piscine de thouars","charles de gaulle",419,[4479059,-59126,25,-10,6,174,-14,153,14,27,47,59,10,37]], // Piscine de Thouars ↔ Charles de Gaulle
     ["piscine grand parc","catros",542,[4485599,-57838,-19,18,-16,-367,-111,-49,-57,96]], // Piscine Grand Parc ↔ Catros
@@ -657,6 +641,7 @@ export default {
     ["rene coty pasteur","halte ter coty",254,[4492762,-49184,49,-83,78,-182]], // René Coty (Pasteur) ↔ Halte TER Coty
     ["republique#1","albret",318,[4483467,-57997,-5,-41,-210,72,-8,-10,8,-38]], // République ↔ Albret
     ["republique#1","palais de justice",190,[4483508,-58016,-3,-33,121,-45,-6,-28]], // République ↔ Palais de Justice
+    ["residence crespy","mairie de talence",396,[4480589,-58648,73,31,14,-5,7,10,30,-9,152,5,10,-98]], // Résidence Crespy ↔ Mairie de Talence
     ["residence le chateau","college niki de saint phalle",358,[4477974,-57283,-28,164,1,21,8,27,13,0,99,161]], // Résidence Le Château ↔ Collège Niki de Saint Phalle
     ["residence meignan","emile zola",460,[4490334,-50928,29,14,-3,16,28,99,2,39,50,80,-84,217,12,9]], // Résidence Meignan ↔ Emile Zola
     ["residence meignan","place meignan",192,[4490323,-50933,-25,-12,-18,9,-48,164]], // Résidence Meignan ↔ Place Meignan
@@ -712,7 +697,7 @@ export default {
     ["seguineau","eglise saint augustin",324,[4483501,-60988,-204,-98,-24,-29,-17,-4,-11,33]], // Seguineau ↔ Eglise Saint-Augustin
     ["sembat#1","belvedere",370,[4483340,-54978,16,-33,-6,-6,13,-25,-1,-9,57,-115,16,-53,105,98]], // Sembat ↔ Belvédère
     ["serpent","bougnard",355,[4479181,-63296,58,49,4,-15,-4,-102,6,-18,43,-64,50,-53,9,-1,-2,27]], // Serpent ↔ Bougnard
-    ["simone veil rive gauche","cite sncf",368,[4482050,-54219,-161,-304,-4,7,-33,-62]], // Simone-Veil (Rive Gauche) ↔ Cité SNCF
+    ["simone veil rive gauche","cite sncf",377,[4482050,-54219,-161,-304,-4,7,-33,-62]], // Simone-Veil (Rive Gauche) ↔ Cité SNCF
     ["simone veil rive gauche","pont simone veil rive gauche",128,[4482050,-54219,-30,-59,-9,9,30,61]], // Simone-Veil (Rive Gauche) ↔ Pont Simone Veil (Rive Gauche)
     ["somme","fenelon",397,[4490645,-51713,72,-6,39,18,7,-6,159,167,15,-16,7,-21]], // Somme ↔ Fénelon
     ["somme","montsouris",124,[4490645,-51713,72,-6,3,53]], // Somme ↔ Montsouris
@@ -758,8 +743,7 @@ export default {
     ["urssaf","centre de formation du lac",497,[4487569,-57947,144,-6,9,18,-10,92,-1,79,10,43,-1,20,58,140]], // URSSAF ↔ Centre de Formation du Lac
     ["vassivey","rue de macau",415,[4495249,-60945,-2,46,6,14,-16,33,41,206,147,-29]], // Vassivey ↔ Rue de Macau
     ["vercors","les pins av magudas",285,[4485565,-65710,69,-16,55,-38,15,-3,24,-150]], // Vercors ↔ Les Pins (av Magudas)
-    ["verdun#0","ferme de bauge",489,[4477116,-58219,24,75,8,3,178,-194,68,79,12,2,-8,-63]], // Verdun ↔ Ferme de Baugé
-    ["verdun#1","avenue d eysines",95,[4486059,-61218,3,-27,-8,-17,-50,-10]], // Verdun ↔ Avenue d'Eysines
+    ["verdun","avenue d eysines",95,[4486059,-61218,3,-27,-8,-17,-50,-10]], // Verdun ↔ Avenue d'Eysines
     ["vergne bricaud","richaud",237,[4489094,-56115,-32,1,-30,-16,-105,-148]], // Vergne-Bricaud ↔ Richaud
     ["victoire","hopital saint andre",411,[4483118,-57412,83,-379,88,-13]], // Victoire ↔ Hôpital Saint-André
     ["village 1","arts metiers",429,[4480786,-60360,-12,185,-7,31,-16,29,-30,24,-70,36,-18,18,-23,-11,-10,6,-6,14,-20,-12]], // Village 1 ↔ Arts & Métiers
@@ -781,8 +765,6 @@ export default {
   tooLong: [
     ["polyclinique bordeaux nord","rigal",724], // Polyclinique Bordeaux Nord ↔ Rigal
     ["rue de la paix#1","terrefort#1",615], // Rue de la Paix ↔ Terrefort
-    ["olympiades","pin galant",663], // Olympiades ↔ Pin Galant
-    ["olympiades","mairie de merignac",637], // Olympiades ↔ Mairie de Mérignac
     ["pradas","merignac soleil porte 4",623], // Pradas ↔ Mérignac Soleil (Porte 4)
     ["college emile zola","jean jaures rue de la morandiere",695], // Collège Emile Zola ↔ Jean Jaurès (rue de la Morandière)
     ["le poteau","vendangeurs",1633], // Le Poteau ↔ Vendangeurs
@@ -832,10 +814,12 @@ export default {
     ["lafontaine","lycee gustave eiffel",621], // Lafontaine ↔ Lycée Gustave Eiffel
     ["duplantier","stade suzon",647], // Duplantier ↔ Stade Suzon
     ["mairie de lormont","carriet",685], // Mairie de Lormont ↔ Carriet
+    ["peixotto cote mairie","mairie de talence",649], // Peixotto (côté Mairie) ↔ Mairie de Talence
     ["russel","les compagnons",931], // Russel ↔ Les Compagnons
     ["la vigne","parc du peyrou",1091], // La Vigne ↔ Parc du Peyrou
     ["fragonard","caillou",627], // Fragonard ↔ Caillou
     ["peixotto tram b","noailles",747], // Peixotto (Tram B) ↔ Noailles
+    ["peixotto cote universite","mairie de talence",655], // Peixotto (côté Université) ↔ Mairie de Talence
     ["cassin","becquerel",611], // Cassin ↔ Becquerel
     ["parc sourreil","verlaine",835], // Parc Sourreil ↔ Verlaine
     ["parc sourreil","charles de gaulle",923], // Parc Sourreil ↔ Charles de Gaulle

@@ -6,7 +6,7 @@
 // si l'IGN n'a pas répondu (estimation)]. Identifiants des stations : buildIndex(stops.js).
 
 export default {
-  generatedAt: "2026-10-23",
+  generatedAt: "2026-11-09",
   rows: [
     ["capc musee d art contemporain","jardin public",499,[4484909,-57058,-86,-28,-39,-452,37,-7]], // CAPC Musée d'Art Contemporain ↔ Jardin Public
     ["place de la bourse","quinconces fleuve",357,[4484161,-56954,174,-70,-5,-25,118,-34]], // Place de la Bourse ↔ Quinconces Fleuve
